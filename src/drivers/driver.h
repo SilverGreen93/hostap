@@ -6614,6 +6614,7 @@ union wpa_event_data {
 	 */
 	struct new_sta {
 		const u8 *addr;
+		int ifindex;
 	} new_sta;
 
 	/**

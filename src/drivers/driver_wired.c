@@ -334,20 +334,40 @@ static int wired_send_eapol(void *priv, const u8 *addr,
 #define MIHAI_MAB
 #ifdef MIHAI_MAB
 
-#define MAX_PAYLOAD 2048
-
-#ifndef NDA_RTA
-#define NDA_RTA(r) \
-	((struct rtattr *)(((char *)(r)) + NLMSG_ALIGN(sizeof(struct ndmsg))))
-#endif
-
 struct dl_list head;
+
+#define BUFSIZE 8192
+
+struct nl_req {
+    struct nlmsghdr hdr;
+    struct ndmsg ndm;
+};
 
 struct test {
     struct dl_list list;
     unsigned char mac[6];
+	int ifindex;
     int valid;
 };
+
+void parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len) {
+    memset(tb, 0, sizeof(struct rtattr *) * (max + 1));
+    while (RTA_OK(rta, len)) {
+        if (rta->rta_type <= max)
+            tb[rta->rta_type] = rta;
+        rta = RTA_NEXT(rta, len);
+    }
+}
+
+void print_mac_address(unsigned char *addr) {
+    for (int i = 0; i < 6; i++) {
+        if (i > 0)
+            printf(":");
+        printf("%02x", addr[i]);
+    }
+    printf("\n");
+}
+
 
 void print_list(struct dl_list *head)
 {
@@ -362,181 +382,162 @@ void print_list(struct dl_list *head)
 }
 
 
-int find_mac(struct rtattr *rta, int len, struct hostapd_data *hapd)
-{
-	unsigned char *addr;
-    struct test *t;
-    int addr_len;
-    int i;
-
-	while (RTA_OK(rta, len)) {
-        struct test *it;
-        //struct test *t;
-        int found = 0;
-
-        if (rta->rta_type == NDA_LLADDR) {
-            addr = RTA_DATA(rta);
-            addr_len = RTA_PAYLOAD(rta);
-            //printf ("len = %d\n", addr_len);
-            for (i = 0; i < addr_len; i++) {
-                printf ("%02x:", addr[i]);
- 
-            }
-            printf ("\n\n");
-
-            dl_list_for_each(it, &head, struct test, list) {
-                found = 0;
-                if (memcmp(it->mac, addr, addr_len) == 0) {
-                    found = 1;
-                    it->valid = 1;
-                    break;
-                }
-            }
-
-            if (!found) {
-                t = (struct test *) malloc(sizeof(struct test));
-                memcpy(t->mac, addr, addr_len);
-                t->valid=1;
-                dl_list_add(&head, &t->list);
-
-				//apelez eveniment de new mac
-				union wpa_event_data event;
-				os_memset(&event, 0, sizeof(event));
-				event.new_sta.addr = addr;
-				wpa_supplicant_event(hapd, EVENT_NEW_STA, &event);
-				wpa_supplicant_event(hapd, EVENT_MAB_RX, &event);
-            }
-        }
-		rta = RTA_NEXT(rta, len);
-	}
-	if (len)
-		fprintf(stderr, "!!!Deficit %d, rta_len=%d\n",
-			len, rta->rta_len);
-	return 0;
-}
-
-
 int request_mac(struct hostapd_data *hapd)
 {
-    int nl_socket;
-    struct nlmsghdr *nlh;
-    struct nlmsghdr *nlh_orig;
-    struct sockaddr_nl src_addr, dest_addr;
+    int sockfd;
+    struct sockaddr_nl sa;
+    struct nl_req req;
+    char buf[BUFSIZE];
     struct iovec iov;
     struct msghdr msg;
-    int status = 0;
-    int msglen = 0;
-    int filter = ~(NUD_PERMANENT|NUD_NOARP);
+    struct nlmsghdr *nh;
+    struct ndmsg *ndm;
+    struct rtattr *rta;
+    int len;
     struct test *it, *tmp;
     int ifindex = 0;
 
-    // Create a Netlink socket
-    nl_socket = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
-    if (nl_socket == -1) {
+    sockfd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+    if (sockfd < 0) {
         perror("socket");
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
-    // Initialize the source and destination addresses
-    memset(&src_addr, 0, sizeof(src_addr));
-    src_addr.nl_family = AF_NETLINK;
-    src_addr.nl_pid = getpid();
-    src_addr.nl_groups = 0;  // unicast
+    memset(&sa, 0, sizeof(sa));
+    sa.nl_family = AF_NETLINK;
 
-    memset(&dest_addr, 0, sizeof(dest_addr));
-    dest_addr.nl_family = AF_NETLINK;
-    dest_addr.nl_pid = 0;  // Kernel
-    dest_addr.nl_groups = 0;  // unicast
+    if (bind(sockfd, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
+        perror("bind");
+        close(sockfd);
+        return -1;
+    }
 
-    // Bind the socket
-    bind(nl_socket, (struct sockaddr*)&src_addr, sizeof(src_addr));
+    memset(&req, 0, sizeof(req));
+    req.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ndmsg));
+    req.hdr.nlmsg_type = RTM_GETNEIGH;
+    req.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+    req.hdr.nlmsg_seq = 1;
+    req.ndm.ndm_family = AF_BRIDGE;
 
-    // Prepare and send the Netlink request
-    nlh = (struct nlmsghdr*)malloc(NLMSG_SPACE(MAX_PAYLOAD));
-    memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
-    nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
-    //nlh->nlmsg_type = RTM_GETLINK;
-    nlh->nlmsg_type = RTM_GETNEIGH;
-    nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
-
-    iov.iov_base = (void*)nlh;
-    iov.iov_len = nlh->nlmsg_len;
-
+    iov.iov_base = &req;
+    iov.iov_len = req.hdr.nlmsg_len;
     memset(&msg, 0, sizeof(msg));
-    msg.msg_name = (void*)&dest_addr;
-    msg.msg_namelen = sizeof(dest_addr);
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
 
-    // Send the request
-    sendmsg(nl_socket, &msg, 0);
-    nlh_orig = nlh;
-    print_list(&head);
+    if (sendmsg(sockfd, &msg, 0) < 0) {
+        perror("sendmsg");
+        close(sockfd);
+        return -1;
+    }
+
     ifindex = if_nametoindex(hapd->conf->iface);
     printf ("Current interface %s index = %d\n", hapd->conf->iface, ifindex);
-    // Receive and process responses
+
+    // invalidam lista inainte de parcurgerea MAC-urilor
+    dl_list_for_each(it, &head, struct test, list)
+        it->valid=0;
+
     //while (1) {
-        memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
-        status = recvmsg(nl_socket, &msg, 0);
-        if (status < 0) {
-            return status;
+        len = recv(sockfd, buf, sizeof(buf), 0);
+        if (len < 0) {
+            perror("recv");
+            close(sockfd);
+            return -1;
         }
 
-       // if (nlh->nlmsg_type == NLMSG_DONE)
-           // break;
 
-        if (nlh->nlmsg_type == NLMSG_ERROR) {
-            perror("Netlink error");
-            exit(EXIT_FAILURE);
-        }
-
-        msglen = status;
-        // invalidam lista inainte de parcurgerea MAC-urilor
-        dl_list_for_each(it, &head, struct test, list)
-            it->valid=0;
-
-        while (NLMSG_OK(nlh, msglen)) {
-            struct ndmsg *r;
-            //struct ifinfomsg *ifi_info = (struct ifinfomsg*)NLMSG_DATA(nlh);
-            //struct ndmsg *nd_info = (struct ndmsg*)NLMSG_DATA(nlh);
-            //struct rtaddr *resp = (struct rtaddr*)NDA_RTA(nd_info);
-            if (nlh->nlmsg_type == NLMSG_DONE) {
+        for (nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, len); nh = NLMSG_NEXT(nh, len)) {
+            if (nh->nlmsg_type == NLMSG_DONE)
                 break;
+            if (nh->nlmsg_type == NLMSG_ERROR) {
+                fprintf(stderr, "Error in netlink message\n");
+                close(sockfd);
+                return -1;
             }
 
-            r = NLMSG_DATA(nlh);
-            if (r->ndm_state & filter) {
-                //printf("ndm_state=%d\n",r->ndm_state & filter);
-                //printf ("index = %d\n", r->ndm_ifindex);
-                if (ifindex == r->ndm_ifindex) {
-                    find_mac(NDA_RTA(r), nlh->nlmsg_len - NLMSG_LENGTH(sizeof(*r)), hapd);
-                } else {
-                    printf("Skipping ifindex = %d\n", r->ndm_ifindex);
+            ndm = NLMSG_DATA(nh);
+			rta = (struct rtattr *)((char *)ndm + NLMSG_ALIGN(sizeof(struct ndmsg)));
+            int rta_len = nh->nlmsg_len - NLMSG_LENGTH(sizeof(struct ndmsg));
+            struct rtattr *tb[NDA_MAX + 1];
+            parse_rtattr(tb, NDA_MAX, rta, rta_len);
+
+            if (tb[NDA_LLADDR] && tb[NDA_MASTER] && (ndm->ndm_state & NUD_REACHABLE)) {
+                int master_index = *(int *)RTA_DATA(tb[NDA_MASTER]);
+				int if_index = ndm->ndm_ifindex;
+				char master_name[IF_NAMESIZE];
+				char if_name[IF_NAMESIZE];
+				if_indextoname(master_index, master_name);
+				if_indextoname(if_index, if_name);
+                if (master_index && if_index) {
+					//daca indexul interfetei din bridge este indexul pe care am activat hapd
+                    //if (ifindex == if_index) {
+                        unsigned char *addr;
+                        int addr_len;
+                        int found = 0;
+						struct test *t;
+
+                        addr = (unsigned char *)RTA_DATA(tb[NDA_LLADDR]);
+                        addr_len = RTA_PAYLOAD(tb[NDA_LLADDR]);
+
+						printf(">>>>>>>> Bridge: %s (%d), IF: %s (%d) MAC Address: ", master_name, master_index, if_name, if_index);
+                        print_mac_address(addr);
+
+                        dl_list_for_each(it, &head, struct test, list) {
+                            found = 0;
+                            if (memcmp(it->mac, addr, addr_len) == 0) {
+                                found = 1;
+                                it->valid = 1;
+                                break;
+                            }
+                        }
+
+                        if (!found) {
+                            t = (struct test *) malloc(sizeof(struct test));
+                            memcpy(t->mac, addr, addr_len);
+							t->ifindex = if_index;
+                            t->valid = 1;
+                            dl_list_add(&head, &t->list);
+
+                            //apelez eveniment de new mac
+                            union wpa_event_data event;
+                            os_memset(&event, 0, sizeof(event));
+                            event.new_sta.addr = addr;
+							event.new_sta.ifindex = if_index;
+                            wpa_supplicant_event(hapd, EVENT_NEW_STA, &event);
+                            wpa_supplicant_event(hapd, EVENT_MAB_RX, &event);
+                        }
+                    // } else {
+                    //     printf("Skipping ifindex = %d\n", if_index);
+                    // }
+                    
                 }
-                //printf("Interface Index: %d\n", ifi_info->ifi_index);
             }
-
-            nlh = NLMSG_NEXT(nlh, msglen);
         }
+
+		// if (nh->nlmsg_flags & NLM_F_MULTI) {
+        //     continue;
+        // } else {
+        //     break;
+        // }
     //}
 
     printf("Inainte de remove:\n");
     print_list(&head);
 
-    dl_list_for_each_safe(it, tmp, &head, struct test, list)
+    dl_list_for_each_safe(it, tmp, &head, struct test, list) {
         if (!it->valid) {
-            //struct test *rem = it;
             dl_list_del(&it->list);
             free(it);
         }
+    }
+	//de pus portul inapoi in br0
 
+    printf("Dupa remove:\n");
     print_list(&head);
+	printf("************************************************\n");
 
-    free(nlh_orig);
-
-    // Close the Netlink socket
-    close(nl_socket);
-
+    close(sockfd);
     return 0;
 }
 

@@ -2223,9 +2223,15 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			break;
 		if (sm->is_mab_auth && sta->vlan_id > 0) {
 			//baga in vlan
-			char bridge_name[10];
+			char bridge_name[IFNAMSIZ];
+			char if_name[IFNAMSIZ];
 			snprintf(bridge_name, sizeof(bridge_name), "br%d", sta->vlan_id);
-			br_addif(bridge_name, hapd->conf->iface);
+			wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: ifindex = %d", sta->ifindex);
+			if_indextoname(sta->ifindex, if_name);
+			//de avut in vedere sa nu se mai trimita apeluri de ioctl daca clientul este deja autentificat.
+			//adica daca este deja in br care trebuie SAU daca este in lista de sta.
+			br_delif("br0", if_name);
+			br_addif(bridge_name, if_name);
 		}
 #endif /* CONFIG_NO_VLAN */
 
@@ -2265,6 +2271,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 				   MACSTR, reason_code, MAC2STR(sta->addr));
 			sta->disconnect_reason_code = reason_code;
 		}
+		//clientul trebuie pus din nou in br0
 		break;
 	case RADIUS_CODE_ACCESS_CHALLENGE:
 		sm->eap_if->aaaEapReq = true;

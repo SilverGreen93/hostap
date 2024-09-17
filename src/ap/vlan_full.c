@@ -130,7 +130,7 @@ static int ifconfig_down(const char *if_name)
  */
 #define MAX_BR_PORTS      		256
 
-static int br_delif(const char *br_name, const char *if_name)
+int br_delif(const char *br_name, const char *if_name)
 {
 	int fd;
 	struct ifreq ifr;
