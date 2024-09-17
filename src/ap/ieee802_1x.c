@@ -756,8 +756,8 @@ void mab_receive(struct hostapd_data *hapd, const u8 *sa)
 		sta->eapol_sm->eap_if->portEnabled = true;
 	}
    
-    sta->eapol_sm->flags &= ~EAPOL_SM_WAIT_START;
-    sta->eapol_sm->eapolStart = true;
+    //sta->eapol_sm->flags &= ~EAPOL_SM_WAIT_START;
+    //sta->eapol_sm->eapolStart = true;
     sta->eapol_sm->is_mab_auth = true;
 	sta->eapol_sm->is_mab_auth_sent = false;
 
@@ -2162,7 +2162,24 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 				radius_msg_dump(req);
 				
 				//baga in vlan
-				sta->vlan_id = 66;
+				//sta->vlan_id = 66;
+
+				if (hapd->conf->ssid.dynamic_vlan != DYNAMIC_VLAN_DISABLED &&
+					ieee802_1x_update_vlan(msg, hapd, sta) < 0)
+					break;
+
+				if (sta->vlan_id > 0) {
+					hostapd_logger(hapd, sta->addr,
+							HOSTAPD_MODULE_RADIUS,
+							HOSTAPD_LEVEL_INFO,
+							"VLAN ID %d", sta->vlan_id);
+				}
+
+				if ((sta->flags & WLAN_STA_ASSOC) &&
+					ap_sta_bind_vlan(hapd, sta) < 0)
+					break;
+
+
 
 				sta->session_timeout_set = !!session_timeout_set;
 				os_get_reltime(&sta->session_timeout);
@@ -2243,7 +2260,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		if (hapd->conf->ssid.dynamic_vlan != DYNAMIC_VLAN_DISABLED &&
 		    ieee802_1x_update_vlan(msg, hapd, sta) < 0)
 			break;
-		sta->vlan_id = 77;
+		//sta->vlan_id = 77;
 		if (sta->vlan_id > 0) {
 			hostapd_logger(hapd, sta->addr,
 				       HOSTAPD_MODULE_RADIUS,

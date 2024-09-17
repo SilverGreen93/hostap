@@ -372,10 +372,10 @@ static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 		return NULL;
 	}
 
-	if (pthread_create(&thread, NULL, mac_learn_thread, hapd) != 0) {
-		perror("MIHAI: Failed to create thread");
-		return NULL;
-	}
+	// if (pthread_create(&thread, NULL, mac_learn_thread, hapd) != 0) {
+	// 	perror("MIHAI: Failed to create thread");
+	// 	return NULL;
+	// }
 
 	return drv;
 }
@@ -436,4 +436,5 @@ const struct wpa_driver_ops wpa_driver_wired_ops = {
 	.get_capa = driver_wired_get_capa,
 	.init = wpa_driver_wired_init,
 	.deinit = wpa_driver_wired_deinit,
+	//.if_add = functia_mea_de_add_in_bridge,
 };
