@@ -2366,11 +2366,13 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			if_indextoname(sta->ifindex, if_name);
 			old_bridge_index = get_bridge_index(sta->ifindex);
 			if_indextoname(old_bridge_index, old_bridge_name);
-			snprintf(bridge_name, sizeof(bridge_name), "br-%s", if_name);
+			//snprintf(bridge_name, sizeof(bridge_name), "br-%s", if_name);
+			os_strlcpy(bridge_name, hapd->iconf->parking_vlan, sizeof(bridge_name));
 			if (strcmp(bridge_name, old_bridge_name)) {
 				wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: bag %s din %s in %s", if_name, old_bridge_name, bridge_name);
 				br_delif(old_bridge_name, if_name);
 				br_addif(bridge_name, if_name);
+				set_interface_isolated(sta->ifindex);
 			}
 			//de dezvatat macul pentru a permite clientului sa se reautentifice
 			//ap_free_sta(hapd, sta);

@@ -1251,6 +1251,8 @@ struct hostapd_config {
 	bool ht_vht_twt_responder;
 
 	struct dl_list mab_bridges_list;
+	struct dl_list mab_interfaces;
+	char parking_vlan[IFNAMSIZ + 1];
 };
 
 
