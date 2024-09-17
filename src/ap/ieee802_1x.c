@@ -34,6 +34,7 @@
 #include "ap_drv_ops.h"
 #include "wps_hostapd.h"
 #include "hs20.h"
+#include "ap/mab.h"
 /* FIX: Not really a good thing to require ieee802_11.h here.. (FILS) */
 #include "ieee802_11.h"
 #include "ieee802_1x.h"
@@ -741,6 +742,69 @@ int add_sqlite_radius_attr(struct hostapd_data *hapd, struct sta_info *sta,
 
 #define MIHAI_MAB
 #ifdef MIHAI_MAB
+
+int get_bridge_index(int ifindex) {
+    int sockfd;
+    struct sockaddr_nl sa;
+    struct br_nl_req req;
+    char buf[BUFSIZE];
+    struct iovec iov = { buf, sizeof(buf) };
+    struct msghdr msg = { &sa, sizeof(sa), &iov, 1, NULL, 0, 0 };
+    struct nlmsghdr *nh;
+    struct ifinfomsg *ifi;
+    struct rtattr *tb[IFLA_MAX + 1];
+
+    sockfd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+    if (sockfd < 0) {
+        perror("socket");
+        return -1;
+    }
+
+    memset(&sa, 0, sizeof(sa));
+    sa.nl_family = AF_NETLINK;
+
+    memset(&req, 0, sizeof(req));
+    req.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
+    req.hdr.nlmsg_type = RTM_GETLINK;
+    req.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+    req.hdr.nlmsg_seq = 1;
+    req.ifi.ifi_family = AF_UNSPEC;
+
+    if (send(sockfd, &req, req.hdr.nlmsg_len, 0) < 0) {
+        perror("send");
+        close(sockfd);
+        return -1;
+    }
+
+    while (1) {
+        int len = recv(sockfd, buf, sizeof(buf), 0);
+        if (len < 0) {
+            perror("recv");
+            break;
+        }
+
+        for (nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, len); nh = NLMSG_NEXT(nh, len)) {
+            if (nh->nlmsg_type == NLMSG_DONE)
+                return -1;
+
+            if (nh->nlmsg_type == NLMSG_ERROR) {
+                fprintf(stderr, "Netlink error\n");
+                return -1;
+            }
+
+            ifi = NLMSG_DATA(nh);
+            parse_rtattr(tb, IFLA_MAX, IFLA_RTA(ifi), nh->nlmsg_len - NLMSG_LENGTH(sizeof(*ifi)));
+
+            if (ifi->ifi_index == ifindex && tb[IFLA_MASTER]) {
+                close(sockfd);
+                return *(int *)RTA_DATA(tb[IFLA_MASTER]);
+            }
+        }
+    }
+
+    close(sockfd);
+    return -1;
+}
 
 //bazat pe ieee802_1x_receive
 void mab_receive(struct hostapd_data *hapd, const u8 *sa)
@@ -2221,17 +2285,31 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		if (/*(sta->flags & WLAN_STA_ASSOC) &&*/
 		    ap_sta_bind_vlan(hapd, sta) < 0)
 			break;
-		if (sm->is_mab_auth && sta->vlan_id > 0) {
+		if (sm->is_mab_auth) {// && sta->vlan_id > 0) {
+			struct vlan_description vlan_desc;
+			os_memset(&vlan_desc, 0, sizeof(vlan_desc));
+			vlan_desc.notempty = !!radius_msg_get_vlanid(msg, &vlan_desc.untagged,
+						     MAX_NUM_TAGGED_VLAN,
+						     vlan_desc.tagged);
+			sta->vlan_id = vlan_desc.untagged;
 			//baga in vlan
 			char bridge_name[IFNAMSIZ];
+			char old_bridge_name[IFNAMSIZ];
 			char if_name[IFNAMSIZ];
+			int old_bridge_index;
+			int bridge_index;
 			snprintf(bridge_name, sizeof(bridge_name), "br%d", sta->vlan_id);
-			wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: ifindex = %d", sta->ifindex);
 			if_indextoname(sta->ifindex, if_name);
-			//de avut in vedere sa nu se mai trimita apeluri de ioctl daca clientul este deja autentificat.
-			//adica daca este deja in br care trebuie SAU daca este in lista de sta.
-			br_delif("br0", if_name);
-			br_addif(bridge_name, if_name);
+			old_bridge_index = get_bridge_index(sta->ifindex);
+			if_indextoname(old_bridge_index, old_bridge_name);
+			bridge_index = if_nametoindex(bridge_name);
+			if (strcmp(bridge_name, old_bridge_name)) {
+				wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: bag %s din %s in %s", if_name, old_bridge_name, bridge_name);
+				br_delif(old_bridge_name, if_name);
+				br_addif(bridge_name, if_name);
+			}
+
+			add_mab_bridge(bridge_name, bridge_index, 1);
 		}
 #endif /* CONFIG_NO_VLAN */
 
@@ -2272,6 +2350,23 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			sta->disconnect_reason_code = reason_code;
 		}
 		//clientul trebuie pus din nou in br0
+		if (sm->is_mab_auth) {
+			//baga in vlan br0
+			char old_bridge_name[IFNAMSIZ];
+			char bridge_name[IFNAMSIZ];
+			char if_name[IFNAMSIZ];
+			int old_bridge_index;
+			if_indextoname(sta->ifindex, if_name);
+			old_bridge_index = get_bridge_index(sta->ifindex);
+			if_indextoname(old_bridge_index, old_bridge_name);
+			snprintf(bridge_name, sizeof(bridge_name), "br-%s", if_name);
+			if (strcmp(bridge_name, old_bridge_name)) {
+				wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: bag %s din %s in %s", if_name, old_bridge_name, bridge_name);
+				br_delif(old_bridge_name, if_name);
+				br_addif(bridge_name, if_name);
+			}
+			//de dezvatat macul pentru a permite clientului sa se reautentifice
+		}
 		break;
 	case RADIUS_CODE_ACCESS_CHALLENGE:
 		sm->eap_if->aaaEapReq = true;

@@ -21,10 +21,9 @@
 #include <netlink/netlink.h>
 #include <netlink/msg.h>
 #include <netlink/socket.h>
+#include "ap/mab.h"
 
 #include <sys/ioctl.h>
-#undef IFNAMSIZ
-#include <net/if.h>
 #ifdef __linux__
 #include <netpacket/packet.h>
 #include <net/if_arp.h>
@@ -334,21 +333,18 @@ static int wired_send_eapol(void *priv, const u8 *addr,
 #define MIHAI_MAB
 #ifdef MIHAI_MAB
 
-struct dl_list head;
+struct dl_list learned_mac_list;
+struct dl_list mab_bridges_list;
 
-#define BUFSIZE 8192
-
-struct nl_req {
-    struct nlmsghdr hdr;
-    struct ndmsg ndm;
-};
-
-struct test {
-    struct dl_list list;
-    unsigned char mac[6];
-	int ifindex;
-    int valid;
-};
+void add_mab_bridge(char* bridge_name, int bridge_index, int is_dynamic)
+{
+	struct mab_bridge *mb;
+	mb = malloc(sizeof(struct mab_bridge));
+	mb->br_ifindex = bridge_index;
+	strcpy(mb->br_name, bridge_name);
+	mb->is_dynamic = is_dynamic;
+	dl_list_add(&mab_bridges_list, &mb->list);
+}
 
 void parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len) {
     memset(tb, 0, sizeof(struct rtattr *) * (max + 1));
@@ -368,12 +364,32 @@ void print_mac_address(unsigned char *addr) {
     printf("\n");
 }
 
+int list_contains_bridge(int ifindex, int only_dynamic)
+{
+	int found = 0;
+	struct mab_bridge *it;
+
+	dl_list_for_each(it, &mab_bridges_list, struct mab_bridge, list) {
+		found = 0;
+		if (it->br_ifindex == ifindex) {
+			if (!only_dynamic) {
+				found = 1;
+			} else if (it->is_dynamic) {
+				found = 1;
+			}
+			break;
+		}
+	}
+
+	return found;
+}
+
 
 void print_list(struct dl_list *head)
 {
-    struct test *t;
+    struct learned_mac *t;
     printf("Lista contine:\n");
-    dl_list_for_each(t, head, struct test, list)
+    dl_list_for_each(t, head, struct learned_mac, list)
         printf("%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx (%d) ",
             t->mac[0], t->mac[1], t->mac[2], t->mac[3], t->mac[4], t->mac[5], t->valid);
         
@@ -394,8 +410,7 @@ int request_mac(struct hostapd_data *hapd)
     struct ndmsg *ndm;
     struct rtattr *rta;
     int len;
-    struct test *it, *tmp;
-    int ifindex = 0;
+    struct learned_mac *it, *tmp;
 
     sockfd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
     if (sockfd < 0) {
@@ -431,11 +446,8 @@ int request_mac(struct hostapd_data *hapd)
         return -1;
     }
 
-    ifindex = if_nametoindex(hapd->conf->iface);
-    printf ("Current interface %s index = %d\n", hapd->conf->iface, ifindex);
-
     // invalidam lista inainte de parcurgerea MAC-urilor
-    dl_list_for_each(it, &head, struct test, list)
+    dl_list_for_each(it, &learned_mac_list, struct learned_mac, list)
         it->valid=0;
 
     //while (1) {
@@ -470,12 +482,11 @@ int request_mac(struct hostapd_data *hapd)
 				if_indextoname(master_index, master_name);
 				if_indextoname(if_index, if_name);
                 if (master_index && if_index) {
-					//daca indexul interfetei din bridge este indexul pe care am activat hapd
-                    //if (ifindex == if_index) {
+					//aici trebuie sa parcurgem lista de bridge-uri pe care este activat mab si in plus si bridge-urile pe care a fost autorizat un client
+                    if (list_contains_bridge(master_index, 0)) {
                         unsigned char *addr;
                         int addr_len;
                         int found = 0;
-						struct test *t;
 
                         addr = (unsigned char *)RTA_DATA(tb[NDA_LLADDR]);
                         addr_len = RTA_PAYLOAD(tb[NDA_LLADDR]);
@@ -483,21 +494,25 @@ int request_mac(struct hostapd_data *hapd)
 						printf(">>>>>>>> Bridge: %s (%d), IF: %s (%d) MAC Address: ", master_name, master_index, if_name, if_index);
                         print_mac_address(addr);
 
-                        dl_list_for_each(it, &head, struct test, list) {
+                        dl_list_for_each(it, &learned_mac_list, struct learned_mac, list) {
                             found = 0;
                             if (memcmp(it->mac, addr, addr_len) == 0) {
                                 found = 1;
                                 it->valid = 1;
+								it->ifindex = if_index; //in varianta in care actualizam aici, nu se mai re-trimite la radius request cind se muta pe noul bridge
+								it->br_ifindex = master_index;
                                 break;
                             }
                         }
 
                         if (!found) {
-                            t = (struct test *) malloc(sizeof(struct test));
-                            memcpy(t->mac, addr, addr_len);
-							t->ifindex = if_index;
-                            t->valid = 1;
-                            dl_list_add(&head, &t->list);
+							struct learned_mac *new_mac;
+                            new_mac = (struct learned_mac *) malloc(sizeof(struct learned_mac));
+                            memcpy(new_mac->mac, addr, addr_len);
+							new_mac->ifindex = if_index;
+							new_mac->br_ifindex = master_index;
+                            new_mac->valid = 1;
+                            dl_list_add(&learned_mac_list, &new_mac->list);
 
                             //apelez eveniment de new mac
                             union wpa_event_data event;
@@ -507,10 +522,9 @@ int request_mac(struct hostapd_data *hapd)
                             wpa_supplicant_event(hapd, EVENT_NEW_STA, &event);
                             wpa_supplicant_event(hapd, EVENT_MAB_RX, &event);
                         }
-                    // } else {
-                    //     printf("Skipping ifindex = %d\n", if_index);
-                    // }
-                    
+                    } else {
+                        printf(">>>>>>>>> Skipping bridge ifindex = %d\n", master_index);
+                    }
                 }
             }
         }
@@ -523,18 +537,37 @@ int request_mac(struct hostapd_data *hapd)
     //}
 
     printf("Inainte de remove:\n");
-    print_list(&head);
+    print_list(&learned_mac_list);
 
-    dl_list_for_each_safe(it, tmp, &head, struct test, list) {
+    dl_list_for_each_safe(it, tmp, &learned_mac_list, struct learned_mac, list) {
         if (!it->valid) {
+			//aici de parcurs lista de bridge-uri pe care este activat doar, fara cele in care a fost autorizat
+			if (list_contains_bridge(it->br_ifindex, 1)) {
+				//struct sta_info *sta;
+				//sta = ap_get_sta(hapd, it->mac);
+				//if (sta) {
+					char old_bridge_name[IFNAMSIZ];
+					char bridge_name[IFNAMSIZ];
+					char if_name[IFNAMSIZ];
+					int old_bridge_index;
+					if_indextoname(it->ifindex, if_name);
+					old_bridge_index = get_bridge_index(it->ifindex);
+					if_indextoname(old_bridge_index, old_bridge_name);
+					snprintf(bridge_name, sizeof(bridge_name), "br-%s", if_name);
+					if (strcmp(bridge_name, old_bridge_name)) {
+						wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: bag %s din %s in %s", if_name, old_bridge_name, bridge_name);
+						br_delif(old_bridge_name, if_name);
+						br_addif(bridge_name, if_name);
+					}
+				//}
+			}
             dl_list_del(&it->list);
             free(it);
         }
     }
-	//de pus portul inapoi in br0
 
     printf("Dupa remove:\n");
-    print_list(&head);
+    print_list(&learned_mac_list);
 	printf("************************************************\n");
 
     close(sockfd);
@@ -549,7 +582,11 @@ void* mac_learn_thread(void* arg) {
 	printf("MIHAI: started mac_learn_thread\n");
 	sleep(5);
 
-	dl_list_init(&head);
+	dl_list_init(&learned_mac_list);
+
+	dl_list_init(&mab_bridges_list);
+	add_mab_bridge("br-eno49", 19, 0);
+	add_mab_bridge("br-eno51", 20, 0);
 
 	while (1) {
 		request_mac(hapd);
