@@ -175,6 +175,8 @@ struct eapol_state_machine {
 	unsigned int authenticated; /* The number of times authentication has
 				     * been completed successfully. */
 	bool stopped;
+    bool is_mab_auth;
+	bool is_mab_auth_sent;
 };
 
 #endif /* EAPOL_AUTH_SM_I_H */

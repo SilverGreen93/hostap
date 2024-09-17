@@ -46,6 +46,7 @@ struct eap_user {
 struct eap_eapol_interface {
 	/* Lower layer to full authenticator variables */
 	bool eapResp; /* shared with EAPOL Backend Authentication */
+	bool eap_mab_resp;
 	struct wpabuf *eapRespData;
 	bool portEnabled;
 	int retransWhile;

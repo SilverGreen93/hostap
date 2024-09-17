@@ -567,7 +567,10 @@ SM_STEP(BE_AUTH)
 		SM_ENTER(BE_AUTH, IDLE);
 		break;
 	case BE_AUTH_REQUEST:
-		if (sm->eapolEap)
+        // if (sm->is_mab_auth)
+        //     SM_ENTER(BE_AUTH, SUCCESS);
+		// else
+        if (sm->eapolEap)
 			SM_ENTER(BE_AUTH, RESPONSE);
 		else if (sm->eap_if->eapReq)
 			SM_ENTER(BE_AUTH, REQUEST);
@@ -954,18 +957,25 @@ restart:
 		return;
 	}
 
-    if (prev_auth_pae == AUTH_PAE_AUTHENTICATING && packet_sent) {
-        packet_sent=0;
-        send_mab_request(sm->eapol->conf.ctx, sm->sta);
-    }
+    // if (prev_auth_pae == AUTH_PAE_AUTHENTICATING && packet_sent) {
+    //     //mai trebuie facute 2 lucruri aici, pusa o variabila ca mai jos sa nu se trimita de 2 ori requestul
+    //     //si pus un parametru in sta sa zica ca este pachet de MAB, dupa care putem face discriminarea si aici si la primire.
+    //     packet_sent=0;
+    //     send_mab_request(sm->eapol->conf.ctx, sm->sta);
+    // }
 
-	if (eapol_sm_sta_entry_alive(eapol, addr) && sm->eap) {
+	if (eapol_sm_sta_entry_alive(eapol, addr) && sm->eap) { // -oare zice daca avem un pending requst?
 		if (eap_server_sm_step(sm->eap)) {
 			if (--max_steps > 0)
 				goto restart;
 			/* Re-run from eloop timeout */
 			eapol_auth_step(sm);
 			return;
+		}
+
+		if (sm->is_mab_auth && sm->is_mab_auth_sent == false) {
+			sm->is_mab_auth_sent = true;
+			send_mab_request(sm->eapol->conf.ctx, sm->sta);
 		}
 
 		/* TODO: find a better location for this */

@@ -2631,6 +2631,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		hostapd_event_new_sta(hapd, data->new_sta.addr);
 		break;
     case EVENT_MAB_RX:
+		//SM_STEP_RUN(AUTH_PAE);
         mab_receive(hapd, data->eapol_rx.src);
         break;
 	case EVENT_EAPOL_RX:
