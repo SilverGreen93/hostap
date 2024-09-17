@@ -331,27 +331,233 @@ static int wired_send_eapol(void *priv, const u8 *addr,
 }
 
 
+#define MIHAI_MAB
+#ifdef MIHAI_MAB
+
+#define MAX_PAYLOAD 2048
+
+#ifndef NDA_RTA
+#define NDA_RTA(r) \
+	((struct rtattr *)(((char *)(r)) + NLMSG_ALIGN(sizeof(struct ndmsg))))
+#endif
+
+struct dl_list head;
+
+struct test {
+    struct dl_list list;
+    unsigned char mac[6];
+    int valid;
+};
+
+void print_list(struct dl_list *head)
+{
+    struct test *t;
+    printf("Lista contine:\n");
+    dl_list_for_each(t, head, struct test, list)
+        printf("%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx (%d) ",
+            t->mac[0], t->mac[1], t->mac[2], t->mac[3], t->mac[4], t->mac[5], t->valid);
+        
+    
+    printf("\n(len=%d%s)\n", dl_list_len(head), dl_list_empty(head) ? " empty" : "");
+}
+
+
+int find_mac(struct rtattr *rta, int len, struct hostapd_data *hapd)
+{
+	unsigned char *addr;
+    struct test *t;
+    int addr_len;
+    int i;
+
+	while (RTA_OK(rta, len)) {
+        struct test *it;
+        //struct test *t;
+        int found = 0;
+
+        if (rta->rta_type == NDA_LLADDR) {
+            addr = RTA_DATA(rta);
+            addr_len = RTA_PAYLOAD(rta);
+            //printf ("len = %d\n", addr_len);
+            for (i = 0; i < addr_len; i++) {
+                printf ("%02x:", addr[i]);
+ 
+            }
+            printf ("\n\n");
+
+            dl_list_for_each(it, &head, struct test, list) {
+                found = 0;
+                if (memcmp(it->mac, addr, addr_len) == 0) {
+                    found = 1;
+                    it->valid = 1;
+                    break;
+                }
+            }
+
+            if (!found) {
+                t = (struct test *) malloc(sizeof(struct test));
+                memcpy(t->mac, addr, addr_len);
+                t->valid=1;
+                dl_list_add(&head, &t->list);
+
+				//apelez eveniment de new mac
+				union wpa_event_data event;
+				os_memset(&event, 0, sizeof(event));
+				event.new_sta.addr = addr;
+				wpa_supplicant_event(hapd, EVENT_NEW_STA, &event);
+				wpa_supplicant_event(hapd, EVENT_MAB_RX, &event);
+            }
+        }
+		rta = RTA_NEXT(rta, len);
+	}
+	if (len)
+		fprintf(stderr, "!!!Deficit %d, rta_len=%d\n",
+			len, rta->rta_len);
+	return 0;
+}
+
+
+int request_mac(struct hostapd_data *hapd)
+{
+    int nl_socket;
+    struct nlmsghdr *nlh;
+    struct nlmsghdr *nlh_orig;
+    struct sockaddr_nl src_addr, dest_addr;
+    struct iovec iov;
+    struct msghdr msg;
+    int status = 0;
+    int msglen = 0;
+    int filter = ~(NUD_PERMANENT|NUD_NOARP);
+    struct test *it, *tmp;
+    int ifindex = 0;
+
+    // Create a Netlink socket
+    nl_socket = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+    if (nl_socket == -1) {
+        perror("socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Initialize the source and destination addresses
+    memset(&src_addr, 0, sizeof(src_addr));
+    src_addr.nl_family = AF_NETLINK;
+    src_addr.nl_pid = getpid();
+    src_addr.nl_groups = 0;  // unicast
+
+    memset(&dest_addr, 0, sizeof(dest_addr));
+    dest_addr.nl_family = AF_NETLINK;
+    dest_addr.nl_pid = 0;  // Kernel
+    dest_addr.nl_groups = 0;  // unicast
+
+    // Bind the socket
+    bind(nl_socket, (struct sockaddr*)&src_addr, sizeof(src_addr));
+
+    // Prepare and send the Netlink request
+    nlh = (struct nlmsghdr*)malloc(NLMSG_SPACE(MAX_PAYLOAD));
+    memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
+    nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
+    //nlh->nlmsg_type = RTM_GETLINK;
+    nlh->nlmsg_type = RTM_GETNEIGH;
+    nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+
+    iov.iov_base = (void*)nlh;
+    iov.iov_len = nlh->nlmsg_len;
+
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_name = (void*)&dest_addr;
+    msg.msg_namelen = sizeof(dest_addr);
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+
+    // Send the request
+    sendmsg(nl_socket, &msg, 0);
+    nlh_orig = nlh;
+    print_list(&head);
+    ifindex = if_nametoindex(hapd->conf->iface);
+    printf ("Current interface %s index = %d\n", hapd->conf->iface, ifindex);
+    // Receive and process responses
+    //while (1) {
+        memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
+        status = recvmsg(nl_socket, &msg, 0);
+        if (status < 0) {
+            return status;
+        }
+
+       // if (nlh->nlmsg_type == NLMSG_DONE)
+           // break;
+
+        if (nlh->nlmsg_type == NLMSG_ERROR) {
+            perror("Netlink error");
+            exit(EXIT_FAILURE);
+        }
+
+        msglen = status;
+        // invalidam lista inainte de parcurgerea MAC-urilor
+        dl_list_for_each(it, &head, struct test, list)
+            it->valid=0;
+
+        while (NLMSG_OK(nlh, msglen)) {
+            struct ndmsg *r;
+            //struct ifinfomsg *ifi_info = (struct ifinfomsg*)NLMSG_DATA(nlh);
+            //struct ndmsg *nd_info = (struct ndmsg*)NLMSG_DATA(nlh);
+            //struct rtaddr *resp = (struct rtaddr*)NDA_RTA(nd_info);
+            if (nlh->nlmsg_type == NLMSG_DONE) {
+                break;
+            }
+
+            r = NLMSG_DATA(nlh);
+            if (r->ndm_state & filter) {
+                //printf("ndm_state=%d\n",r->ndm_state & filter);
+                //printf ("index = %d\n", r->ndm_ifindex);
+                if (ifindex == r->ndm_ifindex) {
+                    find_mac(NDA_RTA(r), nlh->nlmsg_len - NLMSG_LENGTH(sizeof(*r)), hapd);
+                } else {
+                    printf("Skipping ifindex = %d\n", r->ndm_ifindex);
+                }
+                //printf("Interface Index: %d\n", ifi_info->ifi_index);
+            }
+
+            nlh = NLMSG_NEXT(nlh, msglen);
+        }
+    //}
+
+    printf("Inainte de remove:\n");
+    print_list(&head);
+
+    dl_list_for_each_safe(it, tmp, &head, struct test, list)
+        if (!it->valid) {
+            //struct test *rem = it;
+            dl_list_del(&it->list);
+            free(it);
+        }
+
+    print_list(&head);
+
+    free(nlh_orig);
+
+    // Close the Netlink socket
+    close(nl_socket);
+
+    return 0;
+}
+
 void* mac_learn_thread(void* arg) {
-    char src[6] = {0x9c, 0x8e, 0x99, 0x2c, 0xaf, 0x78}; //adresa MAC a suplicantului
+    //char src[6] = {0x9c, 0x8e, 0x99, 0x2c, 0xaf, 0x78}; //adresa MAC a suplicantului
 	struct hostapd_data *hapd = arg;
 	//struct sta_info *sta;
-	union wpa_event_data event;
 
 	printf("MIHAI: started mac_learn_thread\n");
 	sleep(5);
-	
-    os_memset(&event, 0, sizeof(event));
-    event.new_sta.addr = &src;
-    wpa_supplicant_event(hapd, EVENT_NEW_STA, &event);
-    wpa_supplicant_event(hapd, EVENT_MAB_RX, &event);
-    
-	//sta = ap_get_sta(hapd, (u8 *)src);
-	//memcpy(sta->eapol_sm->identity, src, 6); -- de pus mac-ul si in identity daca vrem sa folosim asta ca username
-	//send_mab_request(hapd, &sta, src);
 
+	dl_list_init(&head);
+
+	while (1) {
+		request_mac(hapd);
+		sleep(10);
+	}
+	
     return NULL;
 }
-
+#endif //MIHAI_MAB
 
 static struct nl_sock * nl_create_handle(struct nl_cb *cb, const char *dbg)
 {

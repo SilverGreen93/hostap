@@ -834,7 +834,7 @@ fail:
     wpa_printf(MSG_INFO, "MIHAI: FAIL");
 	radius_msg_free(msg);
 }
-#endif MIHAI_MAB
+#endif //MIHAI_MAB
 
 void ieee802_1x_encapsulate_radius(struct hostapd_data *hapd,
 				   struct sta_info *sta,
@@ -2150,67 +2150,6 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
     }
 	sta = sm->sta;
 
-	// if (sm->is_mab_auth) {
-	// 	switch (hdr->code) {
-	// 		case RADIUS_CODE_ACCESS_ACCEPT:
-			
-	// 			wpa_printf(MSG_DEBUG, "MIHAI: pachet RADIUS primit pentru MAB");
-	// 			// de aici luam informatia de VLAN
-	// 			radius_msg_dump(msg);
-	// 			wpa_printf(MSG_DEBUG, "MIHAI: Requestul initial care a fost trimis la radius");
-	// 			// de aici luam User-Name
-	// 			radius_msg_dump(req);
-				
-	// 			//baga in vlan
-	// 			//sta->vlan_id = 66;
-
-	// 			if (hapd->conf->ssid.dynamic_vlan != DYNAMIC_VLAN_DISABLED &&
-	// 				ieee802_1x_update_vlan(msg, hapd, sta) < 0)
-	// 				break;
-
-	// 			if (sta->vlan_id > 0) {
-	// 				hostapd_logger(hapd, sta->addr,
-	// 						HOSTAPD_MODULE_RADIUS,
-	// 						HOSTAPD_LEVEL_INFO,
-	// 						"VLAN ID %d", sta->vlan_id);
-	// 			}
-
-	// 			if ((sta->flags & WLAN_STA_ASSOC) &&
-	// 				ap_sta_bind_vlan(hapd, sta) < 0)
-	// 				break;
-
-
-
-	// 			sta->session_timeout_set = !!session_timeout_set;
-	// 			os_get_reltime(&sta->session_timeout);
-	// 			sta->session_timeout.sec += session_timeout;
-	// 			sm->eap_if->aaaSuccess = true; //EAP_AAA
-	// 			sm->authSuccess = true; //AUTH_PAE
-	// 			//sm->eap_if->eapSuccess = true; //BE_AUTH
-	// 			//sm->eap_if->aaaEapReq = false;
-	// 			//sm->eap_if->eapResp = true;
-	// 			sm->eap_if->eap_mab_resp = true;
-	// 			//sm->eap_if->retransWhile = 12;
-	// 			//sm->eapolEap = true;
-	// 			break;
-
-	// 		case RADIUS_CODE_ACCESS_REJECT:
-	// 			sm->eap_if->aaaFail = true;
-	// 			sm->authFail = true;
-	// 			sm->eap_if->eapFail = true;
-	// 			if (radius_msg_get_attr_int32(msg, RADIUS_ATTR_WLAN_REASON_CODE,
-	// 							&reason_code) == 0) {
-	// 				wpa_printf(MSG_DEBUG,
-	// 					"MIHAI: RADIUS server indicated WLAN-Reason-Code %u in Access-Reject for "
-	// 					MACSTR, reason_code, MAC2STR(sta->addr));
-	// 				sta->disconnect_reason_code = reason_code;
-	// 			}
-	// 			break;
-	// 	}
-	// 	eapol_auth_step(sm);
-
-	// 	return RADIUS_RX_QUEUED;
-	// }
 	if (!sm->is_mab_auth) {
 	if (radius_msg_verify(msg, shared_secret, shared_secret_len, req, 1)) {
 		wpa_printf(MSG_INFO,
@@ -2266,8 +2205,6 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			// de aici luam User-Name
 			radius_msg_dump(req);
 			
-			//baga in vlan
-			br_addif("br0", "eno51");
 		}
 
 		if (hapd->conf->ssid.dynamic_vlan != DYNAMIC_VLAN_DISABLED &&
@@ -2284,6 +2221,12 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		if (/*(sta->flags & WLAN_STA_ASSOC) &&*/
 		    ap_sta_bind_vlan(hapd, sta) < 0)
 			break;
+		if (sm->is_mab_auth && sta->vlan_id > 0) {
+			//baga in vlan
+			char bridge_name[10];
+			snprintf(bridge_name, sizeof(bridge_name), "br%d", sta->vlan_id);
+			br_addif(bridge_name, hapd->conf->iface);
+		}
 #endif /* CONFIG_NO_VLAN */
 
 		sta->session_timeout_set = !!session_timeout_set;
@@ -2301,14 +2244,16 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 
 		sm->eap_if->aaaSuccess = true;
 		override_eapReq = 1;
-		ieee802_1x_get_keys(hapd, sta, msg, req, shared_secret,
-				    shared_secret_len);
-		ieee802_1x_store_radius_class(hapd, sta, msg);
-		ieee802_1x_update_sta_identity(hapd, sta, msg);
-		ieee802_1x_update_sta_cui(hapd, sta, msg);
-		ieee802_1x_check_hs20(hapd, sta, msg,
-				      session_timeout_set ?
-				      (int) session_timeout : -1);
+		if (!sm->is_mab_auth) {
+			ieee802_1x_get_keys(hapd, sta, msg, req, shared_secret,
+						shared_secret_len);
+			ieee802_1x_store_radius_class(hapd, sta, msg);
+			ieee802_1x_update_sta_identity(hapd, sta, msg);
+			ieee802_1x_update_sta_cui(hapd, sta, msg);
+			ieee802_1x_check_hs20(hapd, sta, msg,
+						session_timeout_set ?
+						(int) session_timeout : -1);
+		}
 		break;
 	case RADIUS_CODE_ACCESS_REJECT:
 		sm->eap_if->aaaFail = true;
@@ -2341,7 +2286,9 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		break;
 	}
 
-	ieee802_1x_decapsulate_radius(hapd, sta);
+	if (!sm->is_mab_auth) {
+		ieee802_1x_decapsulate_radius(hapd, sta);
+	}
 	if (override_eapReq)
 		sm->eap_if->aaaEapReq = false;
 
