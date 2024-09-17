@@ -353,6 +353,37 @@ void* mac_learn_thread(void* arg) {
 }
 
 
+static struct nl_sock * nl_create_handle(struct nl_cb *cb, const char *dbg)
+{
+	struct nl_sock *handle;
+
+	handle = nl_socket_alloc_cb(cb);
+	if (handle == NULL) {
+		wpa_printf(MSG_ERROR, "nl80211: Failed to allocate netlink "
+			   "callbacks (%s)", dbg);
+		return NULL;
+	}
+
+	if (genl_connect(handle)) {
+		wpa_printf(MSG_ERROR, "nl80211: Failed to connect to generic "
+			   "netlink (%s)", dbg);
+		nl_socket_free(handle);
+		return NULL;
+	}
+
+	return handle;
+}
+
+
+static void nl_destroy_handles(struct nl_sock **handle)
+{
+	if (*handle == NULL)
+		return;
+	nl_socket_free(*handle);
+	*handle = NULL;
+}
+
+
 static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 				     struct wpa_init_params *params)
 {
@@ -512,15 +543,15 @@ static int wired_create_iface_once(struct wpa_driver_wired_data *drv,
 	int ifidx;
 	int ret = -ENOBUFS;
 
-	wpa_printf(MSG_DEBUG, "nl80211: Create interface iftype %d (%s)",
-		   iftype, nl80211_iftype_str(iftype));
+	wpa_printf(MSG_DEBUG, "MIHAI: Create interface iftype %d", iftype);
+	wpa_printf(MSG_DEBUG, "MIHAI: Create interface ifname %s", ifname);
 
-	msg = wired_cmd_msg(drv, 0, NL80211_CMD_NEW_INTERFACE);
+	// msg = wired_cmd_msg(drv, 0, NL80211_CMD_NEW_INTERFACE);
 
-	if (!msg ||
-	    nla_put_string(msg, NL80211_ATTR_IFNAME, ifname) ||
-	    nla_put_u32(msg, NL80211_ATTR_IFTYPE, iftype))
-		goto fail;
+	// if (!msg ||
+	//     nla_put_string(msg, NL80211_ATTR_IFNAME, ifname) ||
+	//     nla_put_u32(msg, NL80211_ATTR_IFTYPE, iftype))
+	// 	goto fail;
 
 	// if (iftype == NL80211_IFTYPE_MONITOR) {
 	// 	struct nlattr *flags;
@@ -540,27 +571,27 @@ static int wired_create_iface_once(struct wpa_driver_wired_data *drv,
 	 * Tell cfg80211 that the interface belongs to the socket that created
 	 * it, and the interface should be deleted when the socket is closed.
 	 */
-	if (nla_put_flag(msg, NL80211_ATTR_IFACE_SOCKET_OWNER))
-		goto fail;
+	// if (nla_put_flag(msg, NL80211_ATTR_IFACE_SOCKET_OWNER))
+	// 	goto fail;
 
-	if ((addr && iftype == NL80211_IFTYPE_P2P_DEVICE) &&
-	    nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, addr))
-		goto fail;
+	// if ((addr && iftype == NL80211_IFTYPE_P2P_DEVICE) &&
+	//     nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, addr))
+	// 	goto fail;
 
 	//ret = send_and_recv_resp(drv, msg, handler, arg);
-	ret = send_and_recv(NULL, drv->common.nl, msg,
-			     handler, arg, NULL, NULL, NULL);
-	msg = NULL;
-	if (ret) {
-	fail:
-		nlmsg_free(msg);
-		wpa_printf(MSG_ERROR, "Failed to create interface %s: %d (%s)",
-			   ifname, ret, strerror(-ret));
-		return ret;
-	}
+	// ret = send_and_recv(NULL, drv->common.nl, msg,
+	// 		     handler, arg, NULL, NULL, NULL);
+	// msg = NULL;
+	// if (ret) {
+	// fail:
+	// 	nlmsg_free(msg);
+	// 	wpa_printf(MSG_ERROR, "Failed to create interface %s: %d (%s)",
+	// 		   ifname, ret, strerror(-ret));
+	// 	return ret;
+	// }
 
 	ifidx = if_nametoindex(ifname);
-	wpa_printf(MSG_DEBUG, "nl80211: New interface %s created: ifindex=%d",
+	wpa_printf(MSG_DEBUG, "MIHAI: New interface %s created: ifindex=%d",
 		   ifname, ifidx);
 
 	if (ifidx <= 0)

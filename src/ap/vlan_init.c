@@ -151,8 +151,13 @@ int vlan_init(struct hostapd_data *hapd)
 		}
 
 		vlan->vlan_id = VLAN_ID_WILDCARD;
-		ret = os_snprintf(vlan->ifname, sizeof(vlan->ifname), "%s.#",
+		if (!strcmp(hapd->driver->name, "wired")) {
+			ret = os_snprintf(vlan->ifname, sizeof(vlan->ifname), "%s",
 				  hapd->conf->iface);
+		} else {
+			ret = os_snprintf(vlan->ifname, sizeof(vlan->ifname), "%s.#",
+				  hapd->conf->iface);
+		}
 		if (ret >= (int) sizeof(vlan->ifname)) {
 			wpa_printf(MSG_WARNING,
 				   "VLAN: Interface name was truncated to %s",
@@ -212,8 +217,12 @@ struct hostapd_vlan * vlan_add_dynamic(struct hostapd_data *hapd,
 		n->vlan_desc = *vlan_desc;
 	n->dynamic_vlan = 1;
 
-	ret = os_snprintf(n->ifname, sizeof(n->ifname), "%s%d%s",
-			  ifname, vlan_id, pos);
+	if (!strcmp(hapd->driver->name, "wired")) {
+		ret = os_snprintf(n->ifname, sizeof(n->ifname), hapd->conf->iface);
+	} else {
+		ret = os_snprintf(n->ifname, sizeof(n->ifname), "%s%d%s",
+				  ifname, vlan_id, pos);
+	}
 	if (os_snprintf_error(sizeof(n->ifname), ret)) {
 		os_free(n);
 		return NULL;
@@ -224,10 +233,18 @@ struct hostapd_vlan * vlan_add_dynamic(struct hostapd_data *hapd,
 	hapd->conf->vlan = n;
 
 	/* hapd->conf->vlan needs this new VLAN here for WPA setup */
+	if (!strcmp(hapd->driver->name, "wired")) {
+		if (vlan_if_add(hapd, n, 1)) {
+			hapd->conf->vlan = n->next;
+			os_free(n);
+			n = NULL;
+		}
+	} else {
 	if (vlan_if_add(hapd, n, 0)) {
 		hapd->conf->vlan = n->next;
 		os_free(n);
 		n = NULL;
+	}
 	}
 
 	return n;

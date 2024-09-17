@@ -570,7 +570,7 @@ SM_STEP(BE_AUTH)
         // if (sm->is_mab_auth)
         //     SM_ENTER(BE_AUTH, SUCCESS);
 		// else
-        if (sm->eapolEap)
+		if (sm->eapolEap)
 			SM_ENTER(BE_AUTH, RESPONSE);
 		else if (sm->eap_if->eapReq)
 			SM_ENTER(BE_AUTH, REQUEST);

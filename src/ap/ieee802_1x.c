@@ -2267,6 +2267,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			radius_msg_dump(req);
 			
 			//baga in vlan
+			br_addif("br0", "eno51");
 		}
 
 		if (hapd->conf->ssid.dynamic_vlan != DYNAMIC_VLAN_DISABLED &&
@@ -2280,7 +2281,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 				       "VLAN ID %d", sta->vlan_id);
 		}
 
-		if ((sta->flags & WLAN_STA_ASSOC) &&
+		if (/*(sta->flags & WLAN_STA_ASSOC) &&*/
 		    ap_sta_bind_vlan(hapd, sta) < 0)
 			break;
 #endif /* CONFIG_NO_VLAN */

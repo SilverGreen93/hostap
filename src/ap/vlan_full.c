@@ -185,7 +185,7 @@ done:
 	returns 1 if the interface is already part of the bridge
 	returns 0 otherwise
 */
-static int br_addif(const char *br_name, const char *if_name)
+int br_addif(const char *br_name, const char *if_name)
 {
 	int fd;
 	struct ifreq ifr;
