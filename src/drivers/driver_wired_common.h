@@ -17,6 +17,11 @@ struct driver_wired_common_data {
 	int sock; /* raw packet socket for driver access */
 	int pf_sock;
 	int membership, multi, iff_allmulti, iff_up;
+	struct nl_cb *nl_cb;
+	struct nl_sock *nl;
+	struct nl_sock *nl_event;
+	int nlctrl_id;
+	int nl80211_id;
 };
 
 static const u8 pae_group_addr[ETH_ALEN] =
