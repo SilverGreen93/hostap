@@ -573,6 +573,8 @@ SM_STEP(BE_AUTH)
 			SM_ENTER(BE_AUTH, REQUEST);
 		else if (sm->eap_if->eapTimeout)
 			SM_ENTER(BE_AUTH, TIMEOUT);
+        // else if (sm->eap_if->eapSuccess); //am pus variabila pe succes din functia de receive
+        //     SM_ENTER(BE_AUTH, SUCCESS);
 		break;
 	case BE_AUTH_RESPONSE:
 		if (sm->eap_if->eapNoReq)
@@ -892,6 +894,7 @@ void eapol_auth_free(struct eapol_state_machine *sm)
 	os_free(sm);
 }
 
+int packet_sent = 1;
 
 static int eapol_sm_sta_entry_alive(struct eapol_authenticator *eapol,
 				    const u8 *addr)
@@ -950,6 +953,11 @@ restart:
 		eapol_auth_step(sm);
 		return;
 	}
+
+    if (prev_auth_pae == AUTH_PAE_AUTHENTICATING && packet_sent) {
+        packet_sent=0;
+        send_mab_request(sm->eapol->conf.ctx, sm->sta);
+    }
 
 	if (eapol_sm_sta_entry_alive(eapol, addr) && sm->eap) {
 		if (eap_server_sm_step(sm->eap)) {

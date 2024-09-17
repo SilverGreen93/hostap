@@ -14,6 +14,10 @@
 #include "driver.h"
 #include "driver_wired_common.h"
 
+#include <pthread.h>
+#include "ap/sta_info.h"
+#include "ap/ieee802_1x.h"
+
 #include <sys/ioctl.h>
 #undef IFNAMSIZ
 #include <net/if.h>
@@ -51,7 +55,7 @@ struct wpa_driver_wired_data {
 	int use_pae_group_addr;
 };
 
-
+#define HOSTAPD
 /* TODO: detecting new devices should eventually be changed from using DHCP
  * snooping to trigger on any packet from a new layer 2 MAC address, e.g.,
  * based on ebtables, etc. */
@@ -96,7 +100,7 @@ static void handle_data(void *ctx, unsigned char *buf, size_t len)
 	hdr = (struct ieee8023_hdr *) buf;
 
 	switch (ntohs(hdr->ethertype)) {
-	case ETH_P_PAE:
+	case ETH_P_PAE: //ETH_P_IP:
 		wpa_printf(MSG_MSGDUMP, "Received EAPOL packet");
 		sa = hdr->src;
 		os_memset(&event, 0, sizeof(event));
@@ -173,7 +177,7 @@ static int wired_init_sockets(struct wpa_driver_wired_data *drv, u8 *own_addr)
 	struct sockaddr_in addr2;
 	int n = 1;
 
-	drv->common.sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_PAE));
+	drv->common.sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_PAE)); // numai frame eapol
 	if (drv->common.sock < 0) {
 		wpa_printf(MSG_ERROR, "socket[PF_PACKET,SOCK_RAW]: %s",
 			   strerror(errno));
@@ -323,10 +327,33 @@ static int wired_send_eapol(void *priv, const u8 *addr,
 }
 
 
+void* mac_learn_thread(void* arg) {
+    char *src="MIHAI"; //adresa MAC a suplicantului
+	struct hostapd_data *hapd = arg;
+	//struct sta_info *sta;
+	union wpa_event_data event;
+
+	printf("MIHAI: started mac_learn_thread\n");
+	sleep(5);
+	
+    os_memset(&event, 0, sizeof(event));
+    event.new_sta.addr = src;
+    wpa_supplicant_event(hapd, EVENT_NEW_STA, &event);
+    wpa_supplicant_event(hapd, EVENT_MAB_RX, &event);
+    
+	//sta = ap_get_sta(hapd, (u8 *)src);
+	//memcpy(sta->eapol_sm->identity, src, 6); -- de pus mac-ul si in identity daca vrem sa folosim asta ca username
+	//send_mab_request(hapd, &sta, src);
+
+    return NULL;
+}
+
+
 static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 				     struct wpa_init_params *params)
 {
 	struct wpa_driver_wired_data *drv;
+	pthread_t thread;
 
 	drv = os_zalloc(sizeof(struct wpa_driver_wired_data));
 	if (drv == NULL) {
@@ -342,6 +369,11 @@ static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 
 	if (wired_init_sockets(drv, params->own_addr)) {
 		os_free(drv);
+		return NULL;
+	}
+
+	if (pthread_create(&thread, NULL, mac_learn_thread, hapd) != 0) {
+		perror("MIHAI: Failed to create thread");
 		return NULL;
 	}
 

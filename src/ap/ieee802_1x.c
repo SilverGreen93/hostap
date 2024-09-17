@@ -741,28 +741,48 @@ int add_sqlite_radius_attr(struct hostapd_data *hapd, struct sta_info *sta,
 
 #define MIHAI_MAB
 #ifdef MIHAI_MAB
-// bazat pe ieee802_1x_encapsulate_radius
-//send_mab_request(hapd, sta) -- trebuie apelata in contextul de: AUTH_PAE entering state AUTHENTICATING, poate prin eapol_sm_step_run
-void send_mab_request(struct hostapd_data *hapd,
-				   struct sta_info *sta)
+
+//bazat pe ieee802_1x_receive
+void mab_receive(struct hostapd_data *hapd, const u8 *sa)
 {
-    // vezi eapol_auth_initialize & co. pentru primele 2 variabile.
-    // cumva noi nu cred ca ar trebui sa avem treaba cu state machine-ul.
-    //struct hostapd_data *hapd; //--> de unde il iau pe asta?
-    // in teorie el e pasat din sm->eapol->conf.ctx
-    //struct sta_info *sta; //ceva informatii despre starea curenta??
-    // e pasat din sm->sta
+    struct sta_info *sta;
 
-    int radius_identifier;
+    sta = ap_get_sta(hapd, sa);
 
+    if (!sta->eapol_sm) {
+		sta->eapol_sm = ieee802_1x_alloc_eapol_sm(hapd, sta);
+		if (!sta->eapol_sm)
+			return;      
+		sta->eapol_sm->eap_if->portEnabled = true;
+	}
+   
+    sta->eapol_sm->flags &= ~EAPOL_SM_WAIT_START;
+    sta->eapol_sm->eapolStart = true;
+
+    eapol_auth_step(sta->eapol_sm);
+}
+
+// bazat pe ieee802_1x_encapsulate_radius
+void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta)
+{
+
+    struct eapol_state_machine *sm = sta->eapol_sm;
     struct radius_msg *msg;
-    char *identity = "MIHAI";
-    size_t identity_len = strlen(identity);
+    char identity[6];
+    char *password = "test123";
+    size_t identity_len;
+    size_t password_len = strlen(password);
 
+	if (!sm)
+		return;
+
+    memcpy(identity, sm->addr, 6);
+    identity_len = strlen(identity);
+    
 	wpa_printf(MSG_DEBUG, "MIHAI: pachet RADIUS MAB");
 
-    radius_identifier = radius_client_get_id(hapd->radius);
-    msg = radius_msg_new(RADIUS_CODE_ACCESS_REQUEST, radius_identifier);
+    sm->radius_identifier = radius_client_get_id(hapd->radius);
+    msg = radius_msg_new(RADIUS_CODE_ACCESS_REQUEST, sm->radius_identifier);
     if (!msg) {
 		wpa_printf(MSG_INFO, "MIHAI: Could not create new RADIUS packet");
 		return;
@@ -782,9 +802,9 @@ void send_mab_request(struct hostapd_data *hapd,
 	}
 
   	if (!radius_msg_add_attr_user_password(
-		    msg, (u8 *) "test123", 7,
-		    /*hapd->radius->conf->auth_servers->shared_secret*/ "testing123",
-		    /*hapd->radius->conf->auth_servers->shared_secret_len*/ 10)) {
+		    msg, (u8 *) password, password_len,
+            hapd->conf->radius->auth_server->shared_secret,
+            hapd->conf->radius->auth_server->shared_secret_len)) {
 		wpa_printf(MSG_INFO, "MIHAI: Could not add User-Password");
 		goto fail;
     }
@@ -801,9 +821,6 @@ void send_mab_request(struct hostapd_data *hapd,
 		wpa_printf(MSG_INFO, "MIHAI: Could not add Framed-MTU");
 		goto fail;
 	}
-
-
-
 
 	if (radius_client_send(hapd->radius, msg, RADIUS_AUTH, sta->addr) < 0)
 		goto fail;
@@ -1239,7 +1256,7 @@ void ieee802_1x_receive(struct hostapd_data *hapd, const u8 *sa, const u8 *buf,
 			   "   frame too short for this IEEE 802.1X packet");
 		if (sta->eapol_sm)
 			sta->eapol_sm->dot1xAuthEapLengthErrorFramesRx++;
-		return;
+		return; //intra pe aici daca nu e eapol
 	}
 	if (len - sizeof(*hdr) > datalen) {
 		wpa_printf(MSG_DEBUG,
@@ -2131,6 +2148,44 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
     }
 	sta = sm->sta;
 
+    switch (hdr->code) {
+        case RADIUS_CODE_ACCESS_ACCEPT:
+        
+            wpa_printf(MSG_DEBUG, "MIHAI: pachet RADIUS primit pentru MAB");
+            // de aici luam informatia de VLAN
+            radius_msg_dump(msg);
+            wpa_printf(MSG_DEBUG, "MIHAI: Requestul initial care a fost trimis la radius");
+            // de aici luam User-Name
+            radius_msg_dump(req);
+            
+            //baga in vlan
+
+            sta->session_timeout_set = !!session_timeout_set;
+            os_get_reltime(&sta->session_timeout);
+            sta->session_timeout.sec += session_timeout;
+            sm->eap_if->aaaSuccess = true; //EAP_AAA
+            sm->authSuccess = true; //AUTH_PAE
+            sm->eap_if->eapSuccess = true; //BE_AUTH
+            break;
+
+        case RADIUS_CODE_ACCESS_REJECT:
+            sm->eap_if->aaaFail = true;
+            sm->authFail = true;
+            sm->eap_if->eapFail = true;
+            if (radius_msg_get_attr_int32(msg, RADIUS_ATTR_WLAN_REASON_CODE,
+                            &reason_code) == 0) {
+                wpa_printf(MSG_DEBUG,
+                    "MIHAI: RADIUS server indicated WLAN-Reason-Code %u in Access-Reject for "
+                    MACSTR, reason_code, MAC2STR(sta->addr));
+                sta->disconnect_reason_code = reason_code;
+            }
+            break;
+    }
+    eapol_auth_step(sm);
+
+    return RADIUS_RX_QUEUED;
+
+
 	if (radius_msg_verify(msg, shared_secret, shared_secret_len, req, 1)) {
 		wpa_printf(MSG_INFO,
 			   "Incoming RADIUS packet did not have correct Message-Authenticator - dropped");
@@ -2430,8 +2485,8 @@ static void ieee802_1x_aaa_send(void *ctx, void *sta_ctx,
 	struct hostapd_data *hapd = ctx;
 	struct sta_info *sta = sta_ctx;
 
-	//ieee802_1x_encapsulate_radius(hapd, sta, data, datalen);
-    send_mab_request(hapd, sta);
+	ieee802_1x_encapsulate_radius(hapd, sta, data, datalen);
+    //send_mab_request(hapd, sta);
 #endif /* CONFIG_NO_RADIUS */
 }
 

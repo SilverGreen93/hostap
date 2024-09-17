@@ -2630,6 +2630,9 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 	case EVENT_NEW_STA:
 		hostapd_event_new_sta(hapd, data->new_sta.addr);
 		break;
+    case EVENT_MAB_RX:
+        mab_receive(hapd, data->eapol_rx.src);
+        break;
 	case EVENT_EAPOL_RX:
 		hostapd_event_eapol_rx(hapd, data->eapol_rx.src,
 				       data->eapol_rx.data,

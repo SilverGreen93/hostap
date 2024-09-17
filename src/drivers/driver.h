@@ -5585,7 +5585,7 @@ enum wpa_event_type {
 	 * deliver the receive EAPOL frames from the driver.
 	 */
 	EVENT_EAPOL_RX,
-
+    EVENT_MAB_RX,
 	/**
 	 * EVENT_SIGNAL_CHANGE - Indicate change in signal strength
 	 *
