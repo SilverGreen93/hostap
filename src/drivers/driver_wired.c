@@ -334,16 +334,15 @@ static int wired_send_eapol(void *priv, const u8 *addr,
 #ifdef MIHAI_MAB
 
 struct dl_list learned_mac_list;
-struct dl_list mab_bridges_list;
 
-void add_mab_bridge(char* bridge_name, int bridge_index, int is_dynamic)
+void add_mab_bridge(struct dl_list* list, char* bridge_name, int is_dynamic)
 {
 	struct mab_bridge *mb;
 	mb = malloc(sizeof(struct mab_bridge));
-	mb->br_ifindex = bridge_index;
+	mb->br_ifindex = if_nametoindex(bridge_name);
 	strcpy(mb->br_name, bridge_name);
 	mb->is_dynamic = is_dynamic;
-	dl_list_add(&mab_bridges_list, &mb->list);
+	dl_list_add(list, &mb->list);
 }
 
 void parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len) {
@@ -364,12 +363,12 @@ void print_mac_address(unsigned char *addr) {
     printf("\n");
 }
 
-int list_contains_bridge(int ifindex, int only_dynamic)
+int list_contains_bridge(struct dl_list* list, int ifindex, int only_dynamic)
 {
 	int found = 0;
 	struct mab_bridge *it;
 
-	dl_list_for_each(it, &mab_bridges_list, struct mab_bridge, list) {
+	dl_list_for_each(it, list, struct mab_bridge, list) {
 		found = 0;
 		if (it->br_ifindex == ifindex) {
 			if (!only_dynamic) {
@@ -483,7 +482,7 @@ int request_mac(struct hostapd_data *hapd)
 				if_indextoname(if_index, if_name);
                 if (master_index && if_index) {
 					//aici trebuie sa parcurgem lista de bridge-uri pe care este activat mab si in plus si bridge-urile pe care a fost autorizat un client
-                    if (list_contains_bridge(master_index, 0)) {
+                    if (list_contains_bridge(&hapd->iconf->mab_bridges_list, master_index, 0)) {
                         unsigned char *addr;
                         int addr_len;
                         int found = 0;
@@ -542,7 +541,7 @@ int request_mac(struct hostapd_data *hapd)
     dl_list_for_each_safe(it, tmp, &learned_mac_list, struct learned_mac, list) {
         if (!it->valid) {
 			//aici de parcurs lista de bridge-uri pe care este activat doar, fara cele in care a fost autorizat
-			if (list_contains_bridge(it->br_ifindex, 1)) {
+			if (list_contains_bridge(&hapd->iconf->mab_bridges_list, it->br_ifindex, 1)) {
 				//struct sta_info *sta;
 				//sta = ap_get_sta(hapd, it->mac);
 				//if (sta) {
@@ -579,14 +578,14 @@ void* mac_learn_thread(void* arg) {
 	struct hostapd_data *hapd = arg;
 	//struct sta_info *sta;
 
-	printf("MIHAI: started mac_learn_thread\n");
+	printf(">>>>>>>>>>>>>>>>>>>>> MIHAI: started mac_learn_thread\n");
 	sleep(5);
 
 	dl_list_init(&learned_mac_list);
 
-	dl_list_init(&mab_bridges_list);
-	add_mab_bridge("br-eno49", 19, 0);
-	add_mab_bridge("br-eno51", 20, 0);
+	// dl_list_init(&mab_bridges_list);
+	// add_mab_bridge("br-eno49", 19, 0);
+	// add_mab_bridge("br-eno51", 20, 0);
 
 	while (1) {
 		request_mac(hapd);
@@ -650,7 +649,7 @@ static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 	if (drv->common.nl_cb == NULL) {
 		wpa_printf(MSG_ERROR, "nl80211: Failed to allocate netlink "
 			   "callbacks");
-		return -1;
+		return NULL;
 	}
 
 	drv->common.nl = nl_create_handle(drv->common.nl_cb, "nl");
@@ -681,7 +680,7 @@ static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 	}
 
 	if (pthread_create(&thread, NULL, mac_learn_thread, hapd) != 0) {
-		perror("MIHAI: Failed to create thread");
+		perror(">>>>>>>>>>>>>>>>>>>>> MIHAI: Failed to create thread");
 		return NULL;
 	}
 
@@ -783,9 +782,8 @@ static int wired_create_iface_once(struct wpa_driver_wired_data *drv,
 				     int (*handler)(struct nl_msg *, void *),
 				     void *arg)
 {
-	struct nl_msg *msg;
 	int ifidx;
-	int ret = -ENOBUFS;
+	//int ret = -ENOBUFS;
 
 	wpa_printf(MSG_DEBUG, "MIHAI: Create interface iftype %d", iftype);
 	wpa_printf(MSG_DEBUG, "MIHAI: Create interface ifname %s", ifname);

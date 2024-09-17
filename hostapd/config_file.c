@@ -2461,6 +2461,23 @@ static bool get_hexstream(const char *val, struct wpabuf **var,
 #endif /* CONFIG_TESTING_OPTIONS */
 
 
+static void parse_mab_interfaces(char *intf, struct hostapd_config *conf)
+{
+	char *token;
+	printf(">>>>>>> INTERFETE MAB: %s\n", intf);
+
+	dl_list_init(&conf->mab_bridges_list);
+
+    token = strtok(intf, ",");
+
+    while (token != NULL) {
+        printf("%s\n", token);
+		add_mab_bridge(&conf->mab_bridges_list, token, 0);
+        token = strtok(NULL, ",");
+    }
+}
+
+
 static int hostapd_config_fill(struct hostapd_config *conf,
 			       struct hostapd_bss_config *bss,
 			       const char *buf, char *pos, int line)
@@ -2468,6 +2485,8 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	if (os_strcmp(buf, "interface") == 0) {
 		os_strlcpy(conf->bss[0]->iface, pos,
 			   sizeof(conf->bss[0]->iface));
+	} else if (os_strcmp(buf, "mab_interfaces") == 0) {
+		parse_mab_interfaces(pos, conf);
 	} else if (os_strcmp(buf, "bridge") == 0) {
 		os_strlcpy(bss->bridge, pos, sizeof(bss->bridge));
 	} else if (os_strcmp(buf, "bridge_hairpin") == 0) {

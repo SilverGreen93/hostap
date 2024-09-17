@@ -845,7 +845,7 @@ void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta)
 		sta->addr[0], sta->addr[1], sta->addr[2], sta->addr[3], sta->addr[4], sta->addr[5]);
     identity_len = strlen(identity);
     
-	wpa_printf(MSG_DEBUG, "MIHAI: pachet RADIUS MAB pt: %s", identity);
+	wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: pachet RADIUS MAB pt: %s", identity);
 
     sm->radius_identifier = radius_client_get_id(hapd->radius);
     msg = radius_msg_new(RADIUS_CODE_ACCESS_REQUEST, sm->radius_identifier);
@@ -890,12 +890,12 @@ void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta)
 
 	if (radius_client_send(hapd->radius, msg, RADIUS_AUTH, sta->addr) < 0)
 		goto fail;
-    wpa_printf(MSG_DEBUG, "MIHAI: Trimis mesaj la RADIUS");
+    wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: Trimis mesaj la RADIUS");
 
 	return;
 
 fail:
-    wpa_printf(MSG_INFO, "MIHAI: FAIL");
+    wpa_printf(MSG_INFO, ">>>>>>>>>>>>>>>>>>>>> MIHAI: FAIL");
 	radius_msg_free(msg);
 }
 #endif //MIHAI_MAB
@@ -2262,13 +2262,14 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 	case RADIUS_CODE_ACCESS_ACCEPT:
 #ifndef CONFIG_NO_VLAN
 		if (sm->is_mab_auth) {
-			wpa_printf(MSG_DEBUG, "MIHAI: pachet RADIUS primit pentru MAB");
+			wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: pachet RADIUS ACCEPT primit pentru MAB");
 			// de aici luam informatia de VLAN
 			radius_msg_dump(msg);
 			wpa_printf(MSG_DEBUG, "MIHAI: Requestul initial care a fost trimis la radius");
 			// de aici luam User-Name
 			radius_msg_dump(req);
-			
+		} else {
+			wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: pachet RADIUS ACCEPT primit pentru EAPOL");
 		}
 
 		if (hapd->conf->ssid.dynamic_vlan != DYNAMIC_VLAN_DISABLED &&
@@ -2286,6 +2287,8 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		    ap_sta_bind_vlan(hapd, sta) < 0)
 			break;
 		if (sm->is_mab_auth) {// && sta->vlan_id > 0) {
+		//in principiu ar trebui facut doar pentru wired.
+		//de verificat daca radius chiar a si trimis un vlan_id
 			struct vlan_description vlan_desc;
 			os_memset(&vlan_desc, 0, sizeof(vlan_desc));
 			vlan_desc.notempty = !!radius_msg_get_vlanid(msg, &vlan_desc.untagged,
@@ -2309,7 +2312,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 				br_addif(bridge_name, if_name);
 			}
 
-			add_mab_bridge(bridge_name, bridge_index, 1);
+			add_mab_bridge(&hapd->iconf->mab_bridges_list, bridge_name, 1);
 		}
 #endif /* CONFIG_NO_VLAN */
 
@@ -2351,6 +2354,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		}
 		//clientul trebuie pus din nou in br0
 		if (sm->is_mab_auth) {
+			wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: pachet RADIUS REJECT primit pentru MAB");
 			//baga in vlan br0
 			char old_bridge_name[IFNAMSIZ];
 			char bridge_name[IFNAMSIZ];
@@ -2366,9 +2370,15 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 				br_addif(bridge_name, if_name);
 			}
 			//de dezvatat macul pentru a permite clientului sa se reautentifice
+			//ap_free_sta(hapd, sta);
+
+		} else {
+			wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: pachet RADIUS REJECT primit pentru EAPOL");
 		}
+		sm->eap_if->aaaEapReq = true;
 		break;
 	case RADIUS_CODE_ACCESS_CHALLENGE:
+		wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: pachet RADIUS CHALLENGE primit");
 		sm->eap_if->aaaEapReq = true;
 		if (session_timeout_set) {
 			/* RFC 2869, Ch. 2.3.2; RFC 3580, Ch. 3.17 */

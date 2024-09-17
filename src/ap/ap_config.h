@@ -1249,6 +1249,8 @@ struct hostapd_config {
 
 	/* Whether to enable TWT responder in HT and VHT modes */
 	bool ht_vht_twt_responder;
+
+	struct dl_list mab_bridges_list;
 };
 
 
