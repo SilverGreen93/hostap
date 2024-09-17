@@ -1333,7 +1333,10 @@ void ieee802_1x_receive(struct hostapd_data *hapd, const u8 *sa, const u8 *buf,
 	if (sta->eapol_sm) {
 		sta->eapol_sm->dot1xAuthLastEapolFrameVersion = hdr->version;
 		sta->eapol_sm->dot1xAuthEapolFramesRx++;
+		sta->eapol_sm->is_mab_auth = false; //ensure that if a new eapol is received after a mab request, it can be re-authorized.
 	}
+
+	sta->ifindex = if_nametoindex(hapd->conf->iface); // add ifindex to be able to move to the required vlan
 
 	key = (struct ieee802_1x_eapol_key *) (hdr + 1);
 	if (datalen >= sizeof(struct ieee802_1x_eapol_key) &&
@@ -2286,7 +2289,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		if (/*(sta->flags & WLAN_STA_ASSOC) &&*/
 		    ap_sta_bind_vlan(hapd, sta) < 0)
 			break;
-		if (sm->is_mab_auth) {// && sta->vlan_id > 0) {
+		//if (sm->is_mab_auth) {// && sta->vlan_id > 0) {
 		//in principiu ar trebui facut doar pentru wired.
 		//de verificat daca radius chiar a si trimis un vlan_id
 			struct vlan_description vlan_desc;
@@ -2313,7 +2316,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			}
 
 			add_mab_bridge(&hapd->iconf->mab_bridges_list, bridge_name, 1);
-		}
+		//}
 #endif /* CONFIG_NO_VLAN */
 
 		sta->session_timeout_set = !!session_timeout_set;
