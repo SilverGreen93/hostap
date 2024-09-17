@@ -58,7 +58,7 @@ struct wpa_driver_wired_data {
 	int use_pae_group_addr;
 };
 
-#define HOSTAPD
+
 /* TODO: detecting new devices should eventually be changed from using DHCP
  * snooping to trigger on any packet from a new layer 2 MAC address, e.g.,
  * based on ebtables, etc. */

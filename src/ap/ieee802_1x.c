@@ -1322,7 +1322,7 @@ void ieee802_1x_receive(struct hostapd_data *hapd, const u8 *sa, const u8 *buf,
 			   "   frame too short for this IEEE 802.1X packet");
 		if (sta->eapol_sm)
 			sta->eapol_sm->dot1xAuthEapLengthErrorFramesRx++;
-		return; //intra pe aici daca nu e eapol
+		return;
 	}
 	if (len - sizeof(*hdr) > datalen) {
 		wpa_printf(MSG_DEBUG,
@@ -2196,25 +2196,13 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 	struct eapol_state_machine *sm;
 	int override_eapReq = 0;
 	struct radius_hdr *hdr = radius_msg_get_hdr(msg);
-	
+
 	sm = ieee802_1x_search_radius_identifier(hapd, hdr->identifier);
 	if (!sm) {
 		wpa_printf(MSG_DEBUG,
 			   "IEEE 802.1X: Could not find matching station for this RADIUS message");
 		return RADIUS_RX_UNKNOWN;
 	}
-    else { //nu s-a gasit informatie de EAPOL in reply
-        wpa_printf(MSG_DEBUG, "MIHAI: pachet RADIUS primit pentru MAB");
-        // de aici luam informatia de VLAN
-        radius_msg_dump(msg);
-        wpa_printf(MSG_DEBUG, "MIHAI: Requestul initial care a fost trimis la radius");
-        // de aici luam User-Name
-        radius_msg_dump(req);
-
-        return RADIUS_RX_UNKNOWN;
-        //eapol_auth_step(sm);
-	    //return RADIUS_RX_QUEUED;
-    }
 	sta = sm->sta;
 
 	if (!sm->is_mab_auth) {
@@ -2278,7 +2266,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		if (hapd->conf->ssid.dynamic_vlan != DYNAMIC_VLAN_DISABLED &&
 		    ieee802_1x_update_vlan(msg, hapd, sta) < 0)
 			break;
-		//sta->vlan_id = 77;
+
 		if (sta->vlan_id > 0) {
 			hostapd_logger(hapd, sta->addr,
 				       HOSTAPD_MODULE_RADIUS,
@@ -2286,7 +2274,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 				       "VLAN ID %d", sta->vlan_id);
 		}
 
-		if (/*(sta->flags & WLAN_STA_ASSOC) &&*/
+		if ((sta->flags & WLAN_STA_ASSOC) &&
 		    ap_sta_bind_vlan(hapd, sta) < 0)
 			break;
 		//if (sm->is_mab_auth) {// && sta->vlan_id > 0) {
@@ -2589,7 +2577,6 @@ static void ieee802_1x_aaa_send(void *ctx, void *sta_ctx,
 	struct sta_info *sta = sta_ctx;
 
 	ieee802_1x_encapsulate_radius(hapd, sta, data, datalen);
-    //send_mab_request(hapd, sta);
 #endif /* CONFIG_NO_RADIUS */
 }
 

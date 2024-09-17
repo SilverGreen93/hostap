@@ -576,8 +576,6 @@ SM_STEP(BE_AUTH)
 			SM_ENTER(BE_AUTH, REQUEST);
 		else if (sm->eap_if->eapTimeout)
 			SM_ENTER(BE_AUTH, TIMEOUT);
-        // else if (sm->eap_if->eapSuccess); //am pus variabila pe succes din functia de receive
-        //     SM_ENTER(BE_AUTH, SUCCESS);
 		break;
 	case BE_AUTH_RESPONSE:
 		if (sm->eap_if->eapNoReq)
@@ -897,7 +895,6 @@ void eapol_auth_free(struct eapol_state_machine *sm)
 	os_free(sm);
 }
 
-int packet_sent = 1;
 
 static int eapol_sm_sta_entry_alive(struct eapol_authenticator *eapol,
 				    const u8 *addr)
@@ -957,14 +954,7 @@ restart:
 		return;
 	}
 
-    // if (prev_auth_pae == AUTH_PAE_AUTHENTICATING && packet_sent) {
-    //     //mai trebuie facute 2 lucruri aici, pusa o variabila ca mai jos sa nu se trimita de 2 ori requestul
-    //     //si pus un parametru in sta sa zica ca este pachet de MAB, dupa care putem face discriminarea si aici si la primire.
-    //     packet_sent=0;
-    //     send_mab_request(sm->eapol->conf.ctx, sm->sta);
-    // }
-
-	if (eapol_sm_sta_entry_alive(eapol, addr) && sm->eap) { // -oare zice daca avem un pending requst?
+	if (eapol_sm_sta_entry_alive(eapol, addr) && sm->eap) {
 		if (eap_server_sm_step(sm->eap)) {
 			if (--max_steps > 0)
 				goto restart;
