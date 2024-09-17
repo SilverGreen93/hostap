@@ -332,7 +332,7 @@ static int wired_send_eapol(void *priv, const u8 *addr,
 
 
 void* mac_learn_thread(void* arg) {
-    char *src="MIHAI"; //adresa MAC a suplicantului
+    char src[6] = {0x9c, 0x8e, 0x99, 0x2c, 0xaf, 0x78}; //adresa MAC a suplicantului
 	struct hostapd_data *hapd = arg;
 	//struct sta_info *sta;
 	union wpa_event_data event;
@@ -341,7 +341,7 @@ void* mac_learn_thread(void* arg) {
 	sleep(5);
 	
     os_memset(&event, 0, sizeof(event));
-    event.new_sta.addr = src;
+    event.new_sta.addr = &src;
     wpa_supplicant_event(hapd, EVENT_NEW_STA, &event);
     wpa_supplicant_event(hapd, EVENT_MAB_RX, &event);
     

@@ -770,18 +770,18 @@ void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta)
 
     struct eapol_state_machine *sm = sta->eapol_sm;
     struct radius_msg *msg;
-    char identity[6];
-    char *password = "test123";
+    char identity[15];
     size_t identity_len;
-    size_t password_len = strlen(password);
 
 	if (!sm)
 		return;
 
-    memcpy(identity, sm->addr, 6);
+	//stabilire identitate si parola dupa mac
+	snprintf(identity, sizeof(identity), "%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx",
+		sta->addr[0], sta->addr[1], sta->addr[2], sta->addr[3], sta->addr[4], sta->addr[5]);
     identity_len = strlen(identity);
     
-	wpa_printf(MSG_DEBUG, "MIHAI: pachet RADIUS MAB");
+	wpa_printf(MSG_DEBUG, "MIHAI: pachet RADIUS MAB pt: %s", identity);
 
     sm->radius_identifier = radius_client_get_id(hapd->radius);
     msg = radius_msg_new(RADIUS_CODE_ACCESS_REQUEST, sm->radius_identifier);
@@ -804,7 +804,7 @@ void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta)
 	}
 
   	if (!radius_msg_add_attr_user_password(
-		    msg, (u8 *) password, password_len,
+		    msg, (u8 *) identity, identity_len,
             hapd->conf->radius->auth_server->shared_secret,
             hapd->conf->radius->auth_server->shared_secret_len)) {
 		wpa_printf(MSG_INFO, "MIHAI: Could not add User-Password");
