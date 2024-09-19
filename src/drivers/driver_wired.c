@@ -50,6 +50,9 @@ struct ieee8023_hdr {
 #pragma pack(pop)
 #endif /* _MSC_VER */
 
+#ifndef IFLA_BRPORT_ISOLATED
+#define IFLA_BRPORT_ISOLATED	33
+#endif
 
 struct wpa_driver_wired_data {
 	struct driver_wired_common_data common;
