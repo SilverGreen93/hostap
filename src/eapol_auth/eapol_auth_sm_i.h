@@ -175,8 +175,11 @@ struct eapol_state_machine {
 	unsigned int authenticated; /* The number of times authentication has
 				     * been completed successfully. */
 	bool stopped;
-    bool is_mab_auth;
-	bool is_mab_auth_sent;
+
+#ifdef CONFIG_ENABLE_MAB
+	bool is_mab_auth;		// mark this state machine to be for MAB authentication
+	bool is_mab_auth_sent;	// keep track if we sent RADIUS request for this MAC
+#endif /* CONFIG_ENABLE_MAB */
 };
 
 #endif /* EAPOL_AUTH_SM_I_H */
