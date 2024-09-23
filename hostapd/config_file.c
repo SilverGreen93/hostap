@@ -2470,15 +2470,13 @@ static void parse_mab_interfaces(char *intf, struct hostapd_config *conf)
 	char *token;
 	printf(">>>>>>> INTERFETE MAB: %s\n", intf);
 
-	dl_list_init(&conf->mab_interfaces);
+	token = strtok(intf, ",");
 
-    token = strtok(intf, ",");
-
-    while (token != NULL) {
-        printf("%s\n", token);
+	while (token != NULL) {
+		printf("%s\n", token);
 		add_mab_bridge(&conf->mab_interfaces, token, 0);
-        token = strtok(NULL, ",");
-    }
+		token = strtok(NULL, ",");
+	}
 }
 #endif /* CONFIG_ENABLE_MAB */
 
@@ -2495,7 +2493,6 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		parse_mab_interfaces(pos, conf);
 	} else if (os_strcmp(buf, "parking_vlan") == 0) {
 		os_strlcpy(conf->parking_vlan, pos, sizeof(conf->parking_vlan));
-		dl_list_init(&conf->mab_bridges_list);
 		add_mab_bridge(&conf->mab_bridges_list, conf->parking_vlan, 0);
 #endif /* CONFIG_ENABLE_MAB */
 	} else if (os_strcmp(buf, "bridge") == 0) {
