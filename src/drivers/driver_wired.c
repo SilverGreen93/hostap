@@ -16,15 +16,12 @@
 
 #ifdef CONFIG_ENABLE_MAB
 #include <pthread.h>
-#include <linux/nl80211.h>
-#include <netlink/netlink.h>
-#include <netlink/msg.h>
-#include <netlink/socket.h>
-#include <net/if.h>
 #include "mab/mab.h"
 #endif /* CONFIG_ENABLE_MAB */
 
 #include <sys/ioctl.h>
+#undef IFNAMSIZ
+#include <net/if.h>
 #ifdef __linux__
 #include <netpacket/packet.h>
 #include <net/if_arp.h>
@@ -51,9 +48,6 @@ struct ieee8023_hdr {
 #pragma pack(pop)
 #endif /* _MSC_VER */
 
-#ifndef IFLA_BRPORT_ISOLATED
-#define IFLA_BRPORT_ISOLATED	33
-#endif
 
 struct wpa_driver_wired_data {
 	struct driver_wired_common_data common;
@@ -107,7 +101,7 @@ static void handle_data(void *ctx, unsigned char *buf, size_t len)
 	hdr = (struct ieee8023_hdr *) buf;
 
 	switch (ntohs(hdr->ethertype)) {
-	case ETH_P_PAE: //ETH_P_IP:
+	case ETH_P_PAE:
 		wpa_printf(MSG_MSGDUMP, "Received EAPOL packet");
 		sa = hdr->src;
 		os_memset(&event, 0, sizeof(event));
@@ -184,7 +178,7 @@ static int wired_init_sockets(struct wpa_driver_wired_data *drv, u8 *own_addr)
 	struct sockaddr_in addr2;
 	int n = 1;
 
-	drv->common.sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_PAE)); // numai frame eapol
+	drv->common.sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_PAE));
 	if (drv->common.sock < 0) {
 		wpa_printf(MSG_ERROR, "socket[PF_PACKET,SOCK_RAW]: %s",
 			   strerror(errno));
@@ -334,37 +328,6 @@ static int wired_send_eapol(void *priv, const u8 *addr,
 }
 
 
-static struct nl_sock * nl_create_handle(struct nl_cb *cb, const char *dbg)
-{
-	struct nl_sock *handle;
-
-	handle = nl_socket_alloc_cb(cb);
-	if (handle == NULL) {
-		wpa_printf(MSG_ERROR, "nl80211: Failed to allocate netlink "
-			   "callbacks (%s)", dbg);
-		return NULL;
-	}
-
-	if (genl_connect(handle)) {
-		wpa_printf(MSG_ERROR, "nl80211: Failed to connect to generic "
-			   "netlink (%s)", dbg);
-		nl_socket_free(handle);
-		return NULL;
-	}
-
-	return handle;
-}
-
-
-static void nl_destroy_handles(struct nl_sock **handle)
-{
-	if (*handle == NULL)
-		return;
-	nl_socket_free(*handle);
-	*handle = NULL;
-}
-
-
 static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 				     struct wpa_init_params *params)
 {
@@ -385,35 +348,6 @@ static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 		   sizeof(drv->common.ifname));
 	drv->use_pae_group_addr = params->use_pae_group_addr;
 
-	drv->common.nl_cb = nl_cb_alloc(NL_CB_DEFAULT);
-	if (drv->common.nl_cb == NULL) {
-		wpa_printf(MSG_ERROR, "nl80211: Failed to allocate netlink "
-			   "callbacks");
-		return NULL;
-	}
-
-	drv->common.nl = nl_create_handle(drv->common.nl_cb, "nl");
-	if (drv->common.nl == NULL)
-		goto err;
-
-	drv->common.nl80211_id = genl_ctrl_resolve(drv->common.nl, "nl80211");
-	if (drv->common.nl80211_id < 0) {
-		wpa_printf(MSG_ERROR, "nl80211: 'nl80211' generic netlink not "
-			   "found");
-		goto err;
-	}
-
-	drv->common.nlctrl_id = genl_ctrl_resolve(drv->common.nl, "nlctrl");
-	if (drv->common.nlctrl_id < 0) {
-		wpa_printf(MSG_ERROR,
-			   "nl80211: 'nlctrl' generic netlink not found");
-		goto err;
-	}
-
-	drv->common.nl_event = nl_create_handle(drv->common.nl_cb, "event");
-	if (drv->common.nl_event == NULL)
-		goto err;
-
 	if (wired_init_sockets(drv, params->own_addr)) {
 		os_free(drv);
 		return NULL;
@@ -421,18 +355,12 @@ static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 
 #ifdef CONFIG_ENABLE_MAB
 	if (pthread_create(&thread, NULL, mac_learn_thread, hapd) != 0) {
-		perror(">>>>>>>>>>>>>>>>>>>>> MIHAI: Failed to create thread");
+		perror("MAB: Failed to create MAC learning thread!");
 		return NULL;
 	}
 #endif /* CONFIG_ENABLE_MAB */
 
 	return drv;
-
-err:
-	nl_destroy_handles(&drv->common.nl_event);
-	nl_destroy_handles(&drv->common.nl);
-	nl_cb_put(drv->common.nl_cb);
-	return NULL;
 }
 
 
@@ -480,181 +408,6 @@ static void wpa_driver_wired_deinit(void *priv)
 }
 
 
-void * wired_cmd(struct wpa_driver_wired_data *drv,
-		   struct nl_msg *msg, int flags, uint8_t cmd)
-{
-	if (TEST_FAIL())
-		return NULL;
-	return genlmsg_put(msg, 0, 0, drv->common.nl80211_id,
-			   0, flags, cmd, 0);
-}
-
-
-static int wired_set_iface_id(struct nl_msg *msg, struct wpa_driver_wired_data *drv)
-{
-	//if (bss->wdev_id_set)
-	//	return nla_put_u64(msg, NL80211_ATTR_WDEV, bss->wdev_id);
-	int ifindex = if_nametoindex(drv->common.ifname);
-	return nla_put_u32(msg, NL80211_ATTR_IFINDEX, ifindex);
-}
-
-
-struct nl_msg * wired_cmd_msg(struct wpa_driver_wired_data *drv, int flags, uint8_t cmd)
-{
-	struct nl_msg *msg;
-
-	msg = nlmsg_alloc();
-	if (!msg)
-		return NULL;
-
-	if (!wired_cmd(drv, msg, flags, cmd) ||
-	    wired_set_iface_id(msg, drv) < 0) {
-		nlmsg_free(msg);
-		return NULL;
-	}
-
-	return msg;
-}
-
-
-static int wired_create_iface_once(struct wpa_driver_wired_data *drv,
-				     const char *ifname,
-				     enum wpa_driver_if_type iftype,
-				     const u8 *addr, int wds,
-				     int (*handler)(struct nl_msg *, void *),
-				     void *arg)
-{
-	int ifidx;
-	//int ret = -ENOBUFS;
-
-	wpa_printf(MSG_DEBUG, "MIHAI: Create interface iftype %d", iftype);
-	wpa_printf(MSG_DEBUG, "MIHAI: Create interface ifname %s", ifname);
-
-	// msg = wired_cmd_msg(drv, 0, NL80211_CMD_NEW_INTERFACE);
-
-	// if (!msg ||
-	//     nla_put_string(msg, NL80211_ATTR_IFNAME, ifname) ||
-	//     nla_put_u32(msg, NL80211_ATTR_IFTYPE, iftype))
-	// 	goto fail;
-
-	// if (iftype == NL80211_IFTYPE_MONITOR) {
-	// 	struct nlattr *flags;
-
-	// 	flags = nla_nest_start(msg, NL80211_ATTR_MNTR_FLAGS);
-	// 	if (!flags ||
-	// 	    nla_put_flag(msg, NL80211_MNTR_FLAG_COOK_FRAMES))
-	// 		goto fail;
-
-	// 	nla_nest_end(msg, flags);
-	// } else if (wds) {
-	// 	if (nla_put_u8(msg, NL80211_ATTR_4ADDR, wds))
-	// 		goto fail;
-	// }
-
-	/*
-	 * Tell cfg80211 that the interface belongs to the socket that created
-	 * it, and the interface should be deleted when the socket is closed.
-	 */
-	// if (nla_put_flag(msg, NL80211_ATTR_IFACE_SOCKET_OWNER))
-	// 	goto fail;
-
-	// if ((addr && iftype == NL80211_IFTYPE_P2P_DEVICE) &&
-	//     nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, addr))
-	// 	goto fail;
-
-	//ret = send_and_recv_resp(drv, msg, handler, arg);
-	// ret = send_and_recv(NULL, drv->common.nl, msg,
-	// 		     handler, arg, NULL, NULL, NULL);
-	// msg = NULL;
-	// if (ret) {
-	// fail:
-	// 	nlmsg_free(msg);
-	// 	wpa_printf(MSG_ERROR, "Failed to create interface %s: %d (%s)",
-	// 		   ifname, ret, strerror(-ret));
-	// 	return ret;
-	// }
-
-	ifidx = if_nametoindex(ifname);
-	wpa_printf(MSG_DEBUG, "MIHAI: New interface %s created: ifindex=%d",
-		   ifname, ifidx);
-
-	if (ifidx <= 0)
-		return -1;
-
-	return ifidx;
-}
-
-
-int wired_create_iface(struct wpa_driver_wired_data *drv,
-			 const char *ifname, enum wpa_driver_if_type iftype,
-			 const u8 *addr, int wds,
-			 int (*handler)(struct nl_msg *, void *),
-			 void *arg, int use_existing)
-{
-	int ret = 0;
-
-	 ret = wired_create_iface_once(drv, ifname, iftype, addr, wds, handler,
-	 				arg);
-
-	/* if error occurred and interface exists already */
-	if (ret == -ENFILE && if_nametoindex(ifname)) {
-		if (use_existing) {
-			wpa_printf(MSG_DEBUG, "nl80211: Continue using existing interface %s",
-				   ifname);
-			if (addr /*&& iftype != NL80211_IFTYPE_MONITOR*/ &&
-			    linux_set_ifhwaddr(drv->common.sock, ifname,
-					       addr) < 0 &&
-			    (linux_set_iface_flags(drv->common.sock,
-						   ifname, 0) < 0 ||
-			     linux_set_ifhwaddr(drv->common.sock, ifname,
-						addr) < 0 ||
-			     linux_set_iface_flags(drv->common.sock,
-						   ifname, 1) < 0))
-					return -1;
-			return -ENFILE;
-		}
-		wpa_printf(MSG_INFO, "Try to remove and re-create %s", ifname);
-
-		/* Try to remove the interface that was already there. */
-		// wired_remove_iface(drv, if_nametoindex(ifname));
-
-		/* Try to create the interface again */
-		ret = wired_create_iface_once(drv, ifname, iftype, addr,
-		 				wds, handler, arg);
-	}
-
-	return ret;
-}
-
-
-static int wpa_driver_wired_if_add(void *priv, enum wpa_driver_if_type type,
-				     const char *ifname, const u8 *addr,
-				     void *bss_ctx, void **drv_priv,
-				     char *force_ifname, u8 *if_addr,
-				     const char *bridge, int use_existing,
-				     int setup_ap)
-{
-	//struct i802_bss *bss = priv;
-	//struct wpa_driver_wired_data *drv = bss->drv;
-	struct wpa_driver_wired_data *drv = priv;
-	int ifidx;
-
-	printf("MIHAI: wpa_driver_wired_if_add\n");
-	printf("\t type=%d\n", type);
-	printf("\t ifname=%s\n", ifname ? ifname : "null");
-	printf("\t force_ifname=%s\n", force_ifname ? force_ifname : "null");
-	printf("\t bridge=%s\n", bridge ? bridge : "null");
-
-	if (addr)
-		os_memcpy(if_addr, addr, ETH_ALEN);
-
-	ifidx = wired_create_iface(drv, ifname, type, addr,
-	 				     0, NULL, NULL, use_existing);
-
-	return 0;
-}
-
-
 const struct wpa_driver_ops wpa_driver_wired_ops = {
 	.name = "wired",
 	.desc = "Wired Ethernet driver",
@@ -666,5 +419,4 @@ const struct wpa_driver_ops wpa_driver_wired_ops = {
 	.get_capa = driver_wired_get_capa,
 	.init = wpa_driver_wired_init,
 	.deinit = wpa_driver_wired_deinit,
-	.if_add = wpa_driver_wired_if_add,
 };

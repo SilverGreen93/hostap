@@ -5585,7 +5585,7 @@ enum wpa_event_type {
 	 * deliver the receive EAPOL frames from the driver.
 	 */
 	EVENT_EAPOL_RX,
-    EVENT_MAB_RX,
+
 	/**
 	 * EVENT_SIGNAL_CHANGE - Indicate change in signal strength
 	 *
@@ -5972,6 +5972,13 @@ enum wpa_event_type {
 	 * EVENT_MLD_INTERFACE_FREED - Notification of AP MLD interface removal
 	 */
 	EVENT_MLD_INTERFACE_FREED,
+
+#ifdef CONFIG_ENABLE_MAB
+	/**
+	 * EVENT_MAB_RX - MAC learnt for MAC-based authentication
+	 */
+	EVENT_MAB_RX,
+#endif /* CONFIG_ENABLE_MAB */
 };
 
 
@@ -6614,7 +6621,9 @@ union wpa_event_data {
 	 */
 	struct new_sta {
 		const u8 *addr;
-		int ifindex;
+#ifdef CONFIG_ENABLE_MAB
+		int ifindex; //store the ifindex of the interface on which the MAC was learnt
+#endif /* CONFIG_ENABLE_MAB */
 	} new_sta;
 
 	/**

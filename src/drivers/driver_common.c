@@ -101,6 +101,9 @@ const char * event_to_string(enum wpa_event_type event)
 	E2S(TID_LINK_MAP);
 	E2S(LINK_RECONFIG);
 	E2S(MLD_INTERFACE_FREED);
+#ifdef CONFIG_ENABLE_MAB
+	E2S(MAB_RX);
+#endif /* CONFIG_ENABLE_MAB */
 	}
 
 	return "UNKNOWN";

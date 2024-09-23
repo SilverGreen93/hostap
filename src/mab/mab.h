@@ -3,6 +3,12 @@
 
 #include <linux/rtnetlink.h>
 
+#include "ap/sta_info.h"
+
+#ifndef IFLA_BRPORT_ISOLATED
+#define IFLA_BRPORT_ISOLATED	33
+#endif
+
 #define BUFSIZE 8192
 
 struct nl_req {

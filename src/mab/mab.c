@@ -11,7 +11,6 @@
 #include "utils/common.h"
 #include "utils/list.h"
 #include "ap/hostapd.h"
-#include "ap/sta_info.h"
 #include "radius/radius.h"
 #include "radius/radius_client.h"
 #include "eap_server/eap.h"
