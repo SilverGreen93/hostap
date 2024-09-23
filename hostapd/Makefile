@@ -138,10 +138,17 @@ OBJS_c += ../src/utils/$(CONFIG_ELOOP).o
 
 ifeq ($(CONFIG_ELOOP), eloop)
 # Using glibc < 2.17 requires -lrt for clock_gettime()
-LIBS += -lrt -lpthread
-LIBS_c += -lrt -lpthread
-LIBS_h += -lrt -lpthread
-LIBS_n += -lrt -lpthread
+LIBS += -lrt
+LIBS_c += -lrt
+LIBS_h += -lrt
+LIBS_n += -lrt
+endif
+
+ifdef CONFIG_ENABLE_MAB
+LIBS += -lpthread
+LIBS_c += -lpthread
+LIBS_h += -lpthread
+LIBS_n += -lpthread
 endif
 
 ifdef CONFIG_ELOOP_POLL
