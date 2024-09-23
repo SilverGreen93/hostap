@@ -39,7 +39,11 @@ struct mab_bridge {
     int is_dynamic;
 };
 
+int set_interface_isolated(int ifindex);
+int add_mab_bridge(struct dl_list *list, char *bridge_name, int is_dynamic);
 void parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len);
+int list_contains_bridge(struct dl_list *list, int ifindex, int only_dynamic);
+int request_mac(struct hostapd_data *hapd);
 void* mac_learn_thread(void* arg);
 
 #endif

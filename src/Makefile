@@ -1,5 +1,9 @@
-SUBDIRS=ap common crypto drivers eapol_auth eapol_supp eap_common eap_peer eap_server l2_packet mab p2p pae pasn radius rsn_supp tls utils wps
+SUBDIRS=ap common crypto drivers eapol_auth eapol_supp eap_common eap_peer eap_server l2_packet p2p pae pasn radius rsn_supp tls utils wps
 SUBDIRS += fst
+
+ifdef CONFIG_ENABLE_MAB
+SUBDIRS += mab
+endif
 
 all:
 	for d in $(SUBDIRS); do [ -d $$d ] && $(MAKE) -C $$d; done
