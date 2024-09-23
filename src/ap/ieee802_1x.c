@@ -34,7 +34,7 @@
 #include "ap_drv_ops.h"
 #include "wps_hostapd.h"
 #include "hs20.h"
-#include "ap/mab.h"
+#include "mab/mab.h"
 /* FIX: Not really a good thing to require ieee802_11.h here.. (FILS) */
 #include "ieee802_11.h"
 #include "ieee802_1x.h"

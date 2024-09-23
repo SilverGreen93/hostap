@@ -21,7 +21,7 @@
 #include <netlink/netlink.h>
 #include <netlink/msg.h>
 #include <netlink/socket.h>
-#include "ap/mab.h"
+#include "mab/mab.h"
 
 #include <sys/ioctl.h>
 #ifdef __linux__
@@ -336,7 +336,7 @@ static int wired_send_eapol(void *priv, const u8 *addr,
 #define MIHAI_MAB
 #ifdef MIHAI_MAB
 
-struct dl_list learned_mac_list;
+
 
 int set_interface_isolated(int ifindex) {
 
@@ -511,7 +511,7 @@ int request_mac(struct hostapd_data *hapd)
     }
 
     // invalidam lista inainte de parcurgerea MAC-urilor
-    dl_list_for_each(it, &learned_mac_list, struct learned_mac, list)
+    dl_list_for_each(it, &hapd->iconf->learned_mac_list, struct learned_mac, list)
         it->valid=0;
 
     //while (1) {
@@ -558,7 +558,7 @@ int request_mac(struct hostapd_data *hapd)
 						printf(">>>>>>>> Bridge: %s (%d), IF: %s (%d) MAC Address: ", master_name, master_index, if_name, if_index);
                         print_mac_address(addr);
 
-                        dl_list_for_each(it, &learned_mac_list, struct learned_mac, list) {
+                        dl_list_for_each(it, &hapd->iconf->learned_mac_list, struct learned_mac, list) {
                             found = 0;
                             if (memcmp(it->mac, addr, addr_len) == 0) {
                                 found = 1;
@@ -576,7 +576,7 @@ int request_mac(struct hostapd_data *hapd)
 							new_mac->ifindex = if_index;
 							new_mac->br_ifindex = master_index;
                             new_mac->valid = 1;
-                            dl_list_add(&learned_mac_list, &new_mac->list);
+                            dl_list_add(&hapd->iconf->learned_mac_list, &new_mac->list);
 
                             //apelez eveniment de new mac
                             union wpa_event_data event;
@@ -601,9 +601,9 @@ int request_mac(struct hostapd_data *hapd)
     //}
 
     printf("Inainte de remove:\n");
-    print_list(&learned_mac_list);
+    print_list(&hapd->iconf->learned_mac_list);
 
-    dl_list_for_each_safe(it, tmp, &learned_mac_list, struct learned_mac, list) {
+    dl_list_for_each_safe(it, tmp, &hapd->iconf->learned_mac_list, struct learned_mac, list) {
         if (!it->valid) {
 			//mutam portul in br0 doar daca macul a expirat de pe un alt bridge
 			if (list_contains_bridge(&hapd->iconf->mab_bridges_list, it->br_ifindex, 1)) {
@@ -633,7 +633,7 @@ int request_mac(struct hostapd_data *hapd)
     }
 
     printf("Dupa remove:\n");
-    print_list(&learned_mac_list);
+    print_list(&hapd->iconf->learned_mac_list);
 	printf("************************************************\n");
 
     close(sockfd);
@@ -657,30 +657,6 @@ void assign_ports_to_parking_vlan(struct hostapd_data *hapd)
 	}
 }
 
-void* mac_learn_thread(void* arg)
-{
-    //char src[6] = {0x9c, 0x8e, 0x99, 0x2c, 0xaf, 0x78}; //adresa MAC a suplicantului
-	struct hostapd_data *hapd = arg;
-	//struct sta_info *sta;
-
-	printf(">>>>>>>>>>>>>>>>>>>>> MIHAI: started mac_learn_thread\n");
-	sleep(5);
-	assign_ports_to_parking_vlan(hapd);
-	sleep(5);
-
-	dl_list_init(&learned_mac_list);
-
-	// dl_list_init(&mab_bridges_list);
-	// add_mab_bridge("br-eno49", 19, 0);
-	// add_mab_bridge("br-eno51", 20, 0);
-
-	while (1) {
-		request_mac(hapd);
-		sleep(10);
-	}
-	
-    return NULL;
-}
 #endif //MIHAI_MAB
 
 static struct nl_sock * nl_create_handle(struct nl_cb *cb, const char *dbg)

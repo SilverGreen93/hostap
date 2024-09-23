@@ -4,6 +4,12 @@
 #include <net/if.h>
 #include <linux/rtnetlink.h>
 #include <sys/socket.h>
+#include <stdbool.h>
+#include <string.h>
+#include <netinet/in.h>
+#include "utils/common.h"
+#include "utils/list.h"
+#include "ap/hostapd.h"
 
 #define BUFSIZE 8192
 
@@ -34,6 +40,6 @@ struct mab_bridge {
 };
 
 void parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len);
-
+void* mac_learn_thread(void* arg);
 
 #endif
