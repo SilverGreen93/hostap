@@ -1,0 +1,14 @@
+{
+    "files.associations": {
+        "array": "c",
+        "string": "c",
+        "string_view": "c",
+        "ieee802_1x.h": "c",
+        "nl80211.h": "c",
+        "functional": "c",
+        "ioctl.h": "c",
+        "rtnetlink.h": "c",
+        "mab.h": "c"
+    },
+    "C_Cpp.dimInactiveRegions": false
+}
