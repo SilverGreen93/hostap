@@ -20,6 +20,7 @@
 #include <netlink/netlink.h>
 #include <netlink/msg.h>
 #include <netlink/socket.h>
+#include <net/if.h>
 #include "mab/mab.h"
 #endif /* CONFIG_ENABLE_MAB */
 

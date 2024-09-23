@@ -1,15 +1,7 @@
 #ifndef MAB_H
 #define MAB_H
 
-#include <net/if.h>
 #include <linux/rtnetlink.h>
-#include <sys/socket.h>
-#include <stdbool.h>
-#include <string.h>
-#include <netinet/in.h>
-#include "utils/common.h"
-#include "utils/list.h"
-#include "ap/hostapd.h"
 
 #define BUFSIZE 8192
 
@@ -45,5 +37,8 @@ void parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len);
 int list_contains_bridge(struct dl_list *list, int ifindex, int only_dynamic);
 int request_mac(struct hostapd_data *hapd);
 void* mac_learn_thread(void* arg);
+int get_bridge_index(int ifindex);
+void mab_receive(struct hostapd_data *hapd, const u8 *sa);
+void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta);
 
 #endif

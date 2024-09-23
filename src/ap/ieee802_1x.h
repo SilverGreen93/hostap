@@ -17,7 +17,7 @@ struct hostapd_bss_config;
 struct hostapd_radius_attr;
 struct radius_msg;
 
-void mab_receive(struct hostapd_data *hapd, const u8 *sa);
+
 void ieee802_1x_receive(struct hostapd_data *hapd, const u8 *sa, const u8 *buf,
 			size_t len, enum frame_encryption encrypted);
 void ieee802_1x_new_station(struct hostapd_data *hapd, struct sta_info *sta);
@@ -60,7 +60,6 @@ int add_common_radius_attr(struct hostapd_data *hapd,
 			   struct radius_msg *msg);
 int add_sqlite_radius_attr(struct hostapd_data *hapd, struct sta_info *sta,
 			   struct radius_msg *msg, int acct);
-void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta);
 void ieee802_1x_encapsulate_radius(struct hostapd_data *hapd,
 				   struct sta_info *sta,
 				   const u8 *eap, size_t len);

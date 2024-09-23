@@ -1,5 +1,23 @@
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
+
+#include <net/if.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+#include "utils/common.h"
+#include "utils/list.h"
+#include "ap/hostapd.h"
+#include "ap/sta_info.h"
+#include "radius/radius.h"
+#include "radius/radius_client.h"
+#include "eap_server/eap.h"
+#include "eapol_auth/eapol_auth_sm.h"
+#include "eapol_auth/eapol_auth_sm_i.h"
+
 #include "mab.h"
 
 
@@ -387,3 +405,159 @@ void *mac_learn_thread(void *arg)
     return NULL;
 }
 
+
+int get_bridge_index(int ifindex) {
+    int sockfd;
+    struct sockaddr_nl sa;
+    struct br_nl_req req;
+    char buf[BUFSIZE];
+    struct iovec iov = { buf, sizeof(buf) };
+    struct msghdr msg = { &sa, sizeof(sa), &iov, 1, NULL, 0, 0 };
+    struct nlmsghdr *nh;
+    struct ifinfomsg *ifi;
+    struct rtattr *tb[IFLA_MAX + 1];
+
+    sockfd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+    if (sockfd < 0) {
+        perror("socket");
+        return -1;
+    }
+
+    memset(&sa, 0, sizeof(sa));
+    sa.nl_family = AF_NETLINK;
+
+    memset(&req, 0, sizeof(req));
+    req.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
+    req.hdr.nlmsg_type = RTM_GETLINK;
+    req.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+    req.hdr.nlmsg_seq = 1;
+    req.ifi.ifi_family = AF_UNSPEC;
+
+    if (send(sockfd, &req, req.hdr.nlmsg_len, 0) < 0) {
+        perror("send");
+        close(sockfd);
+        return -1;
+    }
+
+    while (1) {
+        int len = recv(sockfd, buf, sizeof(buf), 0);
+        if (len < 0) {
+            perror("recv");
+            break;
+        }
+
+        for (nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, len); nh = NLMSG_NEXT(nh, len)) {
+            if (nh->nlmsg_type == NLMSG_DONE)
+                return -1;
+
+            if (nh->nlmsg_type == NLMSG_ERROR) {
+                fprintf(stderr, "Netlink error\n");
+                return -1;
+            }
+
+            ifi = NLMSG_DATA(nh);
+            parse_rtattr(tb, IFLA_MAX, IFLA_RTA(ifi), nh->nlmsg_len - NLMSG_LENGTH(sizeof(*ifi)));
+
+            if (ifi->ifi_index == ifindex && tb[IFLA_MASTER]) {
+                close(sockfd);
+                return *(int *)RTA_DATA(tb[IFLA_MASTER]);
+            }
+        }
+    }
+
+    close(sockfd);
+    return -1;
+}
+
+//bazat pe ieee802_1x_receive
+void mab_receive(struct hostapd_data *hapd, const u8 *sa)
+{
+    struct sta_info *sta;
+
+    sta = ap_get_sta(hapd, sa);
+
+    if (!sta->eapol_sm) {
+		sta->eapol_sm = ieee802_1x_alloc_eapol_sm(hapd, sta);
+		if (!sta->eapol_sm)
+			return;      
+		sta->eapol_sm->eap_if->portEnabled = true;
+	}
+   
+    //sta->eapol_sm->flags &= ~EAPOL_SM_WAIT_START;
+    //sta->eapol_sm->eapolStart = true;
+    sta->eapol_sm->is_mab_auth = true;
+	sta->eapol_sm->is_mab_auth_sent = false;
+
+    eapol_auth_step(sta->eapol_sm);
+}
+
+// bazat pe ieee802_1x_encapsulate_radius
+void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta)
+{
+
+    struct eapol_state_machine *sm = sta->eapol_sm;
+    struct radius_msg *msg;
+    char identity[15];
+    size_t identity_len;
+
+	if (!sm)
+		return;
+
+	//stabilire identitate si parola dupa mac
+	snprintf(identity, sizeof(identity), "%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx",
+		sta->addr[0], sta->addr[1], sta->addr[2], sta->addr[3], sta->addr[4], sta->addr[5]);
+    identity_len = strlen(identity);
+    
+	wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: pachet RADIUS MAB pt: %s", identity);
+
+    sm->radius_identifier = radius_client_get_id(hapd->radius);
+    msg = radius_msg_new(RADIUS_CODE_ACCESS_REQUEST, sm->radius_identifier);
+    if (!msg) {
+		wpa_printf(MSG_INFO, "MIHAI: Could not create new RADIUS packet");
+		return;
+	}
+
+    if (radius_msg_make_authenticator(msg) < 0) {
+		wpa_printf(MSG_INFO, "MIHAI: Could not make Request Authenticator");
+		goto fail;
+	}
+
+	if (!radius_msg_add_msg_auth(msg))
+		goto fail;
+
+	if (!radius_msg_add_attr(msg, RADIUS_ATTR_USER_NAME, identity, identity_len)) {
+		wpa_printf(MSG_INFO, "MIHAI: Could not add User-Name");
+		goto fail;
+	}
+
+  	if (!radius_msg_add_attr_user_password(
+		    msg, (u8 *) identity, identity_len,
+            hapd->conf->radius->auth_server->shared_secret,
+            hapd->conf->radius->auth_server->shared_secret_len)) {
+		wpa_printf(MSG_INFO, "MIHAI: Could not add User-Password");
+		goto fail;
+    }
+
+    if (add_common_radius_attr(hapd, hapd->conf->radius_auth_req_attr, sta, msg) < 0)
+	    goto fail;
+
+    //SQL lite nu este activat
+	//if (sta && add_sqlite_radius_attr(hapd, sta, msg, 0) < 0)
+	//	goto fail;
+
+	if (!hostapd_config_get_radius_attr(hapd->conf->radius_auth_req_attr, RADIUS_ATTR_FRAMED_MTU) &&
+	    !radius_msg_add_attr_int32(msg, RADIUS_ATTR_FRAMED_MTU, 1400)) {
+		wpa_printf(MSG_INFO, "MIHAI: Could not add Framed-MTU");
+		goto fail;
+	}
+
+	if (radius_client_send(hapd->radius, msg, RADIUS_AUTH, sta->addr) < 0)
+		goto fail;
+    wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: Trimis mesaj la RADIUS");
+
+	return;
+
+fail:
+    wpa_printf(MSG_INFO, ">>>>>>>>>>>>>>>>>>>>> MIHAI: FAIL");
+	radius_msg_free(msg);
+}
