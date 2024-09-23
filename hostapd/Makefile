@@ -85,7 +85,11 @@ OBJS += ../src/ap/bss_load.o
 OBJS += ../src/ap/neighbor_db.o
 OBJS += ../src/ap/rrm.o
 OBJS += ../src/common/ptksa_cache.o
+
+ifdef CONFIG_ENABLE_MAB
+CFLAGS += -DCONFIG_ENABLE_MAB
 OBJS += ../src/mab/mab.o
+endif
 
 OBJS_c = hostapd_cli.o
 OBJS_c += ../src/common/wpa_ctrl.o

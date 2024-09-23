@@ -21,7 +21,9 @@
 #include <netlink/netlink.h>
 #include <netlink/msg.h>
 #include <netlink/socket.h>
+#ifdef CONFIG_ENABLE_MAB
 #include "mab/mab.h"
+#endif /* CONFIG_ENABLE_MAB */
 
 #include <sys/ioctl.h>
 #ifdef __linux__
