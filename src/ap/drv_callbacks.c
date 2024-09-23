@@ -2023,8 +2023,11 @@ static void hostapd_mgmt_tx_cb(struct hostapd_data *hapd, const u8 *buf,
 
 #endif /* NEED_AP_MLME */
 
-
+#ifdef CONFIG_ENABLE_MAB
 static int hostapd_event_new_sta(struct hostapd_data *hapd, const u8 *addr, int ifindex)
+#else
+static int hostapd_event_new_sta(struct hostapd_data *hapd, const u8 *addr)
+#endif /* CONFIG_ENABLE_MAB */
 {
 	struct sta_info *sta = ap_get_sta(hapd, addr);
 
@@ -2035,7 +2038,9 @@ static int hostapd_event_new_sta(struct hostapd_data *hapd, const u8 *addr, int 
 		   " - adding a new STA", MAC2STR(addr));
 	sta = ap_sta_add(hapd, addr);
 	if (sta) {
-		sta->ifindex = ifindex;
+#ifdef CONFIG_ENABLE_MAB
+		sta->ifindex = ifindex; //keep track of the ifindex on which the MAC was learnt
+#endif /* CONFIG_ENABLE_MAB */
 		hostapd_new_assoc_sta(hapd, sta, 0);
 	} else {
 		wpa_printf(MSG_DEBUG, "Failed to add STA entry for " MACSTR,
@@ -2629,12 +2634,15 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 				     data->rx_probe_req.ssi_signal);
 		break;
 	case EVENT_NEW_STA:
+#ifdef CONFIG_ENABLE_MAB
 		hostapd_event_new_sta(hapd, data->new_sta.addr, data->new_sta.ifindex);
 		break;
-    case EVENT_MAB_RX:
-		//SM_STEP_RUN(AUTH_PAE);
-        mab_receive(hapd, data->eapol_rx.src);
-        break;
+	case EVENT_MAB_RX:
+		mab_receive(hapd, data->eapol_rx.src);
+#else
+		hostapd_event_new_sta(hapd, data->new_sta.addr);
+#endif /* CONFIG_ENABLE_MAB */
+		break;
 	case EVENT_EAPOL_RX:
 		hostapd_event_eapol_rx(hapd, data->eapol_rx.src,
 				       data->eapol_rx.data,

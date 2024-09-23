@@ -88,7 +88,9 @@ struct sta_info {
 	struct sta_info *next; /* next entry in sta list */
 	struct sta_info *hnext; /* next entry in hash table list */
 	u8 addr[6];
-	int ifindex;
+#ifdef CONFIG_ENABLE_MAB
+	int ifindex; //store the ifindex of the interface on which the MAC was learnt
+#endif /* CONFIG_ENABLE_MAB */
 	be32 ipaddr;
 	struct dl_list ip6addr; /* list head for struct ip6addr */
 	u16 aid; /* STA's unique AID (1 .. 2007) or 0 if not yet assigned */

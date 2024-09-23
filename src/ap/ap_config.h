@@ -1250,10 +1250,12 @@ struct hostapd_config {
 	/* Whether to enable TWT responder in HT and VHT modes */
 	bool ht_vht_twt_responder;
 
-	struct dl_list learned_mac_list;
-	struct dl_list mab_bridges_list;
-	struct dl_list mab_interfaces;
-	char parking_vlan[IFNAMSIZ + 1];
+#ifdef CONFIG_ENABLE_MAB
+	struct dl_list learned_mac_list;	//list of MACs that have been learned
+	struct dl_list mab_bridges_list;	//list of bridges on which we learn MAC, including parking_vlan
+	struct dl_list mab_interfaces;		//list of interfaces on which MAB is enabled
+	char parking_vlan[IFNAMSIZ + 1];	//interface name of the parking_vlan
+#endif /* CONFIG_ENABLE_MAB */
 };
 
 
