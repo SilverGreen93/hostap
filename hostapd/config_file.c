@@ -25,6 +25,9 @@
 #include "ap/ap_config.h"
 #include "config_file.h"
 
+#ifdef CONFIG_ENABLE_MAB
+#include "mab/mab.h"
+#endif /* CONFIG_ENABLE_MAB */
 
 #ifndef CONFIG_NO_VLAN
 static int hostapd_config_read_vlan_file(struct hostapd_bss_config *bss,
@@ -2461,6 +2464,7 @@ static bool get_hexstream(const char *val, struct wpabuf **var,
 #endif /* CONFIG_TESTING_OPTIONS */
 
 
+#ifdef CONFIG_ENABLE_MAB
 static void parse_mab_interfaces(char *intf, struct hostapd_config *conf)
 {
 	char *token;
@@ -2476,6 +2480,7 @@ static void parse_mab_interfaces(char *intf, struct hostapd_config *conf)
         token = strtok(NULL, ",");
     }
 }
+#endif /* CONFIG_ENABLE_MAB */
 
 
 static int hostapd_config_fill(struct hostapd_config *conf,
@@ -2485,12 +2490,14 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	if (os_strcmp(buf, "interface") == 0) {
 		os_strlcpy(conf->bss[0]->iface, pos,
 			   sizeof(conf->bss[0]->iface));
+#ifdef CONFIG_ENABLE_MAB
 	} else if (os_strcmp(buf, "mab_interfaces") == 0) {
 		parse_mab_interfaces(pos, conf);
 	} else if (os_strcmp(buf, "parking_vlan") == 0) {
 		os_strlcpy(conf->parking_vlan, pos, sizeof(conf->parking_vlan));
 		dl_list_init(&conf->mab_bridges_list);
 		add_mab_bridge(&conf->mab_bridges_list, conf->parking_vlan, 0);
+#endif /* CONFIG_ENABLE_MAB */
 	} else if (os_strcmp(buf, "bridge") == 0) {
 		os_strlcpy(bss->bridge, pos, sizeof(bss->bridge));
 	} else if (os_strcmp(buf, "bridge_hairpin") == 0) {
