@@ -1215,10 +1215,12 @@ SM_STEP(EAP)
 			SM_ENTER(EAP, INITIALIZE);
 		break;
 	case EAP_IDLE:
+#ifdef CONFIG_ENABLE_MAB
 		if (sm->eap_if.eap_mab_resp) {
-			//SM_ENTER(EAP, RECEIVED2);
 			SM_ENTER(EAP, SUCCESS2);
-		} else if (sm->eap_if.retransWhile == 0) {
+		} else
+#endif /* CONFIG_ENABLE_MAB */
+		if (sm->eap_if.retransWhile == 0) {
 			if (sm->try_initiate_reauth) {
 				sm->try_initiate_reauth = false;
 				SM_ENTER(EAP, SELECT_ACTION);

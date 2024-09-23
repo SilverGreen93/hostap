@@ -2164,6 +2164,8 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			ap_sta_no_session_timeout(hapd, sta);
 
 		sm->eap_if->aaaSuccess = true;
+		sm->eap_if->eap_mab_resp = true;
+
 		override_eapReq = 1;
 		if (!sm->is_mab_auth) {
 			ieee802_1x_get_keys(hapd, sta, msg, req, shared_secret,
