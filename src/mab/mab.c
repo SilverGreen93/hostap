@@ -273,8 +273,8 @@ int request_mac(struct hostapd_data *hapd)
             if_indextoname(if_index, if_name);
             if (master_index && if_index)
             {
-                // aici trebuie sa parcurgem lista de bridge-uri pe care este activat mab si in plus si bridge-urile pe care a fost autorizat un client
-                if (list_contains_bridge(&hapd->iconf->mab_bridges_list, master_index, 0))
+                // learn mac only if the ifindex of the port is in the configured ports list
+                if (list_contains_bridge(&hapd->iconf->mab_interfaces, if_index, 0))
                 {
                     unsigned char *addr;
                     int addr_len;
