@@ -1177,6 +1177,7 @@ void ieee802_1x_receive(struct hostapd_data *hapd, const u8 *sa, const u8 *buf,
 		sta->eapol_sm->dot1xAuthLastEapolFrameVersion = hdr->version;
 		sta->eapol_sm->dot1xAuthEapolFramesRx++;
 		sta->eapol_sm->is_mab_auth = false; //ensure that if a new eapol is received after a mab request, it can be re-authorized.
+		sta->eapol_sm->eap_if->eap_mab_resp = false;
 	}
 
 	sta->ifindex = if_nametoindex(hapd->conf->iface); // add ifindex to be able to move to the required vlan
