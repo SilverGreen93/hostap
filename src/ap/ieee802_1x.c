@@ -2103,6 +2103,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			wpa_printf(MSG_DEBUG, "MIHAI: Requestul initial care a fost trimis la radius");
 			// de aici luam User-Name
 			radius_msg_dump(req);
+			ap_sta_set_authorized_flag(hapd, sta, 1);
 		} else {
 			wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: pachet RADIUS ACCEPT primit pentru EAPOL");
 		}
@@ -2191,6 +2192,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		}
 		//clientul trebuie pus din nou in br0
 		if (sm->is_mab_auth) {
+			ap_sta_set_authorized_flag(hapd, sta, 0);
 			wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: pachet RADIUS REJECT primit pentru MAB");
 			//baga in vlan br0
 			char old_bridge_name[IFNAMSIZ];
@@ -3111,6 +3113,19 @@ int ieee802_1x_get_mib_sta(struct hostapd_data *hapd, struct sta_info *sta,
 	if (os_snprintf_error(buflen - len, ret))
 		return len;
 	len += ret;
+
+#ifdef CONFIG_ENABLE_MAB
+	ret = os_snprintf(buf + len, buflen - len,
+			"is_mab_auth=%d\n"
+			"is_mab_auth_sent=%d\n"
+			"eap_mab_resp=%d\n",
+			sta->eapol_sm->is_mab_auth,
+			sta->eapol_sm->is_mab_auth_sent,
+			sta->eapol_sm->eap_if->eap_mab_resp);
+	if (os_snprintf_error(buflen - len, ret))
+		return len;
+	len += ret;
+#endif /* CONFIG_ENABLE_MAB */
 
 	return len;
 }
