@@ -2131,24 +2131,10 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 						     MAX_NUM_TAGGED_VLAN,
 						     vlan_desc.tagged);
 			sta->vlan_id = vlan_desc.untagged;
-			//baga in vlan
-			char bridge_name[IFNAMSIZ];
-			char old_bridge_name[IFNAMSIZ];
-			char if_name[IFNAMSIZ];
-			int old_bridge_index;
-			int bridge_index;
-			snprintf(bridge_name, sizeof(bridge_name), "br%d", sta->vlan_id);
-			if_indextoname(sta->ifindex, if_name);
-			old_bridge_index = get_bridge_index(sta->ifindex);
-			if_indextoname(old_bridge_index, old_bridge_name);
-			bridge_index = if_nametoindex(bridge_name);
-			if (strcmp(bridge_name, old_bridge_name)) {
-				wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: bag %s din %s in %s", if_name, old_bridge_name, bridge_name);
-				br_delif(old_bridge_name, if_name);
-				br_addif(bridge_name, if_name);
-			}
 
-			add_mab_bridge(&hapd->iconf->mab_bridges_list, bridge_name, 1);
+			move_to_vlan(sta->ifindex, sta->vlan_id);
+
+			//add_mab_bridge(&hapd->iconf->mab_bridges_list, bridge_name, 1);
 		//}
 #endif /* CONFIG_NO_VLAN */
 
@@ -2197,24 +2183,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			ap_sta_set_authorized_flag(hapd, sta, 0);
 			wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: pachet RADIUS REJECT primit pentru MAB");
 			//baga in vlan br0
-			char old_bridge_name[IFNAMSIZ];
-			char bridge_name[IFNAMSIZ];
-			char if_name[IFNAMSIZ];
-			int old_bridge_index;
-			if_indextoname(sta->ifindex, if_name);
-			old_bridge_index = get_bridge_index(sta->ifindex);
-			if_indextoname(old_bridge_index, old_bridge_name);
-			//snprintf(bridge_name, sizeof(bridge_name), "br-%s", if_name);
-			os_strlcpy(bridge_name, hapd->iconf->parking_vlan, sizeof(bridge_name));
-			if (strcmp(bridge_name, old_bridge_name)) {
-				wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: bag %s din %s in %s", if_name, old_bridge_name, bridge_name);
-				br_delif(old_bridge_name, if_name);
-				br_addif(bridge_name, if_name);
-				set_interface_isolated(sta->ifindex);
-			}
-			//de dezvatat macul pentru a permite clientului sa se reautentifice
-			//ap_free_sta(hapd, sta);
-
+			move_to_bridge(sta->ifindex, hapd->iconf->parking_vlan);
 		} else {
 			wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: pachet RADIUS REJECT primit pentru EAPOL");
 		}

@@ -37,6 +37,8 @@ struct mab_bridge {
     int is_dynamic;
 };
 
+int move_to_bridge(int if_index, char *new_bridge);
+int move_to_vlan(int if_index, int vlan_id);
 int set_interface_isolated(int ifindex);
 int add_mab_bridge(struct dl_list *list, char *bridge_name, int is_dynamic);
 void parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len);

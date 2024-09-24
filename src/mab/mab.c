@@ -64,6 +64,38 @@ static void assign_ports_to_parking_vlan(struct hostapd_data *hapd)
 }
 
 
+int move_to_bridge(int if_index, char *new_bridge)
+{
+    char old_bridge[IFNAMSIZ];
+    char if_name[IFNAMSIZ];
+    int old_index;
+    int new_index;
+
+    if_indextoname(if_index, if_name);
+    old_index = get_bridge_index(if_index);
+    if_indextoname(old_index, old_bridge);
+    new_index = if_nametoindex(new_bridge);
+
+    if (new_index != old_index) {
+        wpa_printf(MSG_DEBUG, "MAB: Moving %s from %s to %s", if_name, old_bridge, new_bridge);
+        br_delif(old_bridge, if_name);
+        br_addif(new_bridge, if_name);
+    }
+
+    return 0;
+}
+
+
+int move_to_vlan(int if_index, int vlan_id)
+{
+    char new_bridge[IFNAMSIZ];
+
+    snprintf(new_bridge, sizeof(new_bridge), "br%d", vlan_id);
+
+    return move_to_bridge(if_index, new_bridge);
+}
+
+
 int set_interface_isolated(int ifindex)
 {
 
@@ -333,7 +365,7 @@ int request_mac(struct hostapd_data *hapd)
     // }
     //}
 
-    printf("Inainte de remove:\n");
+    printf("learned_mac_list:\n");
     print_list(&hapd->iconf->learned_mac_list);
 
     dl_list_for_each_safe(it, tmp, &hapd->iconf->learned_mac_list, struct learned_mac, list)
@@ -341,37 +373,17 @@ int request_mac(struct hostapd_data *hapd)
         if (!it->valid)
         {
             // mutam portul in br0 doar daca macul a expirat de pe un alt bridge
-            if (list_contains_bridge(&hapd->iconf->mab_bridges_list, it->br_ifindex, 1))
+            //if (list_contains_bridge(&hapd->iconf->mab_bridges_list, it->br_ifindex, 1))
+            int prk_index = if_nametoindex(hapd->iconf->parking_vlan);
+
+            if (it->br_ifindex != prk_index)
             {
-                // struct sta_info *sta;
-                // sta = ap_get_sta(hapd, it->mac);
-                // if (sta) {
-                char old_bridge_name[IFNAMSIZ];
-                char bridge_name[IFNAMSIZ];
-                char if_name[IFNAMSIZ];
-                int old_bridge_index;
-                if_indextoname(it->ifindex, if_name);
-                old_bridge_index = get_bridge_index(it->ifindex);
-                if_indextoname(old_bridge_index, old_bridge_name);
-                // snprintf(bridge_name, sizeof(bridge_name), "br-%s", if_name);
-                os_strlcpy(bridge_name, hapd->iconf->parking_vlan, sizeof(bridge_name));
-                if (strcmp(bridge_name, old_bridge_name))
-                {
-                    wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: bag %s din %s in %s", if_name, old_bridge_name, bridge_name);
-                    br_delif(old_bridge_name, if_name);
-                    br_addif(bridge_name, if_name);
-                    set_interface_isolated(it->ifindex);
-                }
-                //}
+                move_to_bridge(it->ifindex, hapd->iconf->parking_vlan);
             }
             dl_list_del(&it->list);
             free(it);
         }
     }
-
-    printf("Dupa remove:\n");
-    print_list(&hapd->iconf->learned_mac_list);
-    printf("************************************************\n");
 
     close(sockfd);
     return 0;
