@@ -354,9 +354,10 @@ static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 	}
 
 #ifdef CONFIG_ENABLE_MAB
-	if (!dl_list_empty(&hapd->iconf->mab_bridges_list) && !dl_list_empty(&hapd->iconf->mab_interfaces)) {
+	if (!dl_list_empty(&hapd->iconf->mab_interfaces)) {
 		if (pthread_create(&thread, NULL, mac_learn_thread, hapd) != 0) {
 			perror("MAB: Failed to create MAC learning thread!");
+			os_free(drv);
 			return NULL;
 		}
 	} else {

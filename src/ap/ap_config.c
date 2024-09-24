@@ -307,7 +307,6 @@ struct hostapd_config * hostapd_config_defaults(void)
 	hostapd_set_and_check_bw320_offset(conf, 0);
 
 #ifdef CONFIG_ENABLE_MAB
-	dl_list_init(&conf->mab_bridges_list);
 	dl_list_init(&conf->mab_interfaces);
 #endif /* CONFIG_ENABLE_MAB */
 

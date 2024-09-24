@@ -2133,8 +2133,6 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			sta->vlan_id = vlan_desc.untagged;
 
 			move_to_vlan(sta->ifindex, sta->vlan_id);
-
-			//add_mab_bridge(&hapd->iconf->mab_bridges_list, bridge_name, 1);
 		//}
 #endif /* CONFIG_NO_VLAN */
 

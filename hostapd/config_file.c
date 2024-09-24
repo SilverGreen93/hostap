@@ -2493,7 +2493,6 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		parse_mab_interfaces(pos, conf);
 	} else if (os_strcmp(buf, "parking_vlan") == 0) {
 		os_strlcpy(conf->parking_vlan, pos, sizeof(conf->parking_vlan));
-		add_mab_bridge(&conf->mab_bridges_list, conf->parking_vlan, 0);
 #endif /* CONFIG_ENABLE_MAB */
 	} else if (os_strcmp(buf, "bridge") == 0) {
 		os_strlcpy(bss->bridge, pos, sizeof(bss->bridge));

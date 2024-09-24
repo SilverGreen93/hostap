@@ -372,10 +372,9 @@ int request_mac(struct hostapd_data *hapd)
     {
         if (!it->valid)
         {
-            // mutam portul in br0 doar daca macul a expirat de pe un alt bridge
-            //if (list_contains_bridge(&hapd->iconf->mab_bridges_list, it->br_ifindex, 1))
             int prk_index = if_nametoindex(hapd->iconf->parking_vlan);
-
+            //move the port in the parking_vlan only if if was learnt and removed from any other bridge
+            //if the MAC expired from the parking_vlan, this is normal, as it was likely moved to a new vlan
             if (it->br_ifindex != prk_index)
             {
                 move_to_bridge(it->ifindex, hapd->iconf->parking_vlan);
