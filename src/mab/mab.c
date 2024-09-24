@@ -46,20 +46,20 @@ static void print_list(struct dl_list *head)
 
 static void assign_ports_to_parking_vlan(struct hostapd_data *hapd)
 {
-    struct mab_bridge *mb;
+    struct mab_interface *mb;
     int old_bridge_index;
     char old_bridge_name[IFNAMSIZ];
 
-    dl_list_for_each(mb, &hapd->iconf->mab_interfaces, struct mab_bridge, list)
+    dl_list_for_each(mb, &hapd->iconf->mab_interfaces, struct mab_interface, list)
     {
-        old_bridge_index = get_bridge_index(mb->br_ifindex);
+        old_bridge_index = get_bridge_index(mb->if_index);
         if (old_bridge_index > 0)
         {
             if_indextoname(old_bridge_index, old_bridge_name);
-            br_delif(old_bridge_name, mb->br_name);
+            br_delif(old_bridge_name, mb->if_name);
         }
-        br_addif(hapd->iconf->parking_vlan, mb->br_name);
-        set_interface_isolated(mb->br_ifindex);
+        br_addif(hapd->iconf->parking_vlan, mb->if_name);
+        set_interface_isolated(mb->if_index);
     }
 }
 
@@ -151,25 +151,24 @@ int set_interface_isolated(int ifindex)
 }
 
 
-int add_mab_bridge(struct dl_list *list, char *bridge_name, int is_dynamic)
+int add_mab_interface(struct dl_list *list, char *if_name)
 {
-    struct mab_bridge *mb;
+    struct mab_interface *mb;
     int ifindex;
 
-    ifindex = if_nametoindex(bridge_name);
+    ifindex = if_nametoindex(if_name);
     if (!ifindex)
     {
         return -2;
     }
-    if (list_contains_bridge(list, ifindex, 0))
+    if (list_contains_interface(list, ifindex))
     {
         return -1;
     }
 
-    mb = malloc(sizeof(struct mab_bridge));
-    mb->br_ifindex = ifindex;
-    os_strlcpy(mb->br_name, bridge_name, sizeof(mb->br_name));
-    mb->is_dynamic = is_dynamic;
+    mb = malloc(sizeof(struct mab_interface));
+    mb->if_index = ifindex;
+    os_strlcpy(mb->if_name, if_name, sizeof(mb->if_name));
     dl_list_add(list, &mb->list);
 
     return 0;
@@ -188,24 +187,17 @@ void parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len)
 }
 
 
-int list_contains_bridge(struct dl_list *list, int ifindex, int only_dynamic)
+int list_contains_interface(struct dl_list *list, int ifindex)
 {
     int found = 0;
-    struct mab_bridge *it;
+    struct mab_interface *it;
 
-    dl_list_for_each(it, list, struct mab_bridge, list)
+    dl_list_for_each(it, list, struct mab_interface, list)
     {
         found = 0;
-        if (it->br_ifindex == ifindex)
+        if (it->if_index == ifindex)
         {
-            if (!only_dynamic)
-            {
-                found = 1;
-            }
-            else if (it->is_dynamic)
-            {
-                found = 1;
-            }
+            found = 1;
             break;
         }
     }
@@ -306,7 +298,7 @@ int request_mac(struct hostapd_data *hapd)
             if (master_index && if_index)
             {
                 // learn mac only if the ifindex of the port is in the configured ports list
-                if (list_contains_bridge(&hapd->iconf->mab_interfaces, if_index, 0))
+                if (list_contains_interface(&hapd->iconf->mab_interfaces, if_index))
                 {
                     unsigned char *addr;
                     int addr_len;

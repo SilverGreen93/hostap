@@ -2468,13 +2468,12 @@ static bool get_hexstream(const char *val, struct wpabuf **var,
 static void parse_mab_interfaces(char *intf, struct hostapd_config *conf)
 {
 	char *token;
-	printf(">>>>>>> INTERFETE MAB: %s\n", intf);
+	printf("MAB: Initialize interfaces: %s\n", intf);
 
 	token = strtok(intf, ",");
 
 	while (token != NULL) {
-		printf("%s\n", token);
-		add_mab_bridge(&conf->mab_interfaces, token, 0);
+		add_mab_interface(&conf->mab_interfaces, token);
 		token = strtok(NULL, ",");
 	}
 }

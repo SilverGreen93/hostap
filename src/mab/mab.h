@@ -25,24 +25,23 @@ struct br_nl_req {
 struct learned_mac {
     struct dl_list list;
     unsigned char mac[6];
-	int ifindex;
-	int br_ifindex;
+    int ifindex;
+    int br_ifindex;
     int valid;
 };
 
-struct mab_bridge {
+struct mab_interface {
     struct dl_list list;
-	char br_name[IFNAMSIZ];
-	int br_ifindex;
-    int is_dynamic;
+    char if_name[IFNAMSIZ];
+    int if_index;
 };
 
 int move_to_bridge(int if_index, char *new_bridge);
 int move_to_vlan(int if_index, int vlan_id);
 int set_interface_isolated(int ifindex);
-int add_mab_bridge(struct dl_list *list, char *bridge_name, int is_dynamic);
+int add_mab_interface(struct dl_list *list, char *if_name);
 void parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len);
-int list_contains_bridge(struct dl_list *list, int ifindex, int only_dynamic);
+int list_contains_interface(struct dl_list *list, int ifindex);
 int request_mac(struct hostapd_data *hapd);
 void* mac_learn_thread(void* arg);
 int get_bridge_index(int ifindex);
