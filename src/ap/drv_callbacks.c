@@ -43,7 +43,9 @@
 #include "fils_hlp.h"
 #include "neighbor_db.h"
 #include "nan_usd_ap.h"
-
+#ifdef CONFIG_ENABLE_MAB
+#include "mab/mab.h"
+#endif /* CONFIG_ENABLE_MAB */
 
 #ifdef CONFIG_FILS
 void hostapd_notify_assoc_fils_finish(struct hostapd_data *hapd,

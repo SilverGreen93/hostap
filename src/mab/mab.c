@@ -4,6 +4,9 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <net/if.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -16,8 +19,12 @@
 #include "eap_server/eap.h"
 #include "eapol_auth/eapol_auth_sm.h"
 #include "eapol_auth/eapol_auth_sm_i.h"
+#include "ap/ieee802_1x.h"
 
 #include "mab.h"
+
+extern int br_addif(const char *br_name, const char *if_name);
+extern int br_delif(const char *br_name, const char *if_name);
 
 
 static void print_mac_address(unsigned char *addr)
@@ -385,16 +392,16 @@ void *mac_learn_thread(void *arg)
     struct hostapd_data *hapd = arg;
 
     wpa_printf(MSG_INFO, "MAB: Starting MAC learning thread");
-    sleep(5);
+    os_sleep(5, 0);
     assign_ports_to_parking_vlan(hapd);
-    sleep(5);
+    os_sleep(5, 0);
 
     dl_list_init(&hapd->iconf->learned_mac_list);
 
     while (1)
     {
         request_mac(hapd);
-        sleep(10);
+        os_sleep(10, 0);
     }
 
     return NULL;
@@ -406,8 +413,6 @@ int get_bridge_index(int ifindex) {
     struct sockaddr_nl sa;
     struct br_nl_req req;
     char buf[BUFSIZE];
-    struct iovec iov = { buf, sizeof(buf) };
-    struct msghdr msg = { &sa, sizeof(sa), &iov, 1, NULL, 0, 0 };
     struct nlmsghdr *nh;
     struct ifinfomsg *ifi;
     struct rtattr *tb[IFLA_MAX + 1];
@@ -520,13 +525,13 @@ void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta)
 	if (!radius_msg_add_msg_auth(msg))
 		goto fail;
 
-	if (!radius_msg_add_attr(msg, RADIUS_ATTR_USER_NAME, identity, identity_len)) {
+	if (!radius_msg_add_attr(msg, RADIUS_ATTR_USER_NAME, (u8 *)identity, identity_len)) {
 		wpa_printf(MSG_INFO, "MIHAI: Could not add User-Name");
 		goto fail;
 	}
 
   	if (!radius_msg_add_attr_user_password(
-		    msg, (u8 *) identity, identity_len,
+		    msg, (u8 *)identity, identity_len,
             hapd->conf->radius->auth_server->shared_secret,
             hapd->conf->radius->auth_server->shared_secret_len)) {
 		wpa_printf(MSG_INFO, "MIHAI: Could not add User-Password");
