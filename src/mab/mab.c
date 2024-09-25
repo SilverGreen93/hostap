@@ -35,7 +35,6 @@ static void print_mac_address(unsigned char *addr)
 static void print_list(struct dl_list *head)
 {
     struct learned_mac *t;
-    printf("Lista contine:\n");
     dl_list_for_each(t, head, struct learned_mac, list)
         printf("%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx (%d) ",
                t->mac[0], t->mac[1], t->mac[2], t->mac[3], t->mac[4], t->mac[5], t->valid);
@@ -357,7 +356,7 @@ int request_mac(struct hostapd_data *hapd)
     // }
     //}
 
-    printf("learned_mac_list:\n");
+    wpa_printf(MSG_INFO, "MAB: Currently learnt MACs:");
     print_list(&hapd->iconf->learned_mac_list);
 
     dl_list_for_each_safe(it, tmp, &hapd->iconf->learned_mac_list, struct learned_mac, list)
