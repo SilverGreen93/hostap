@@ -64,7 +64,7 @@ static void assign_ports_to_parking_vlan(struct hostapd_data *hapd)
             if_indextoname(old_bridge_index, old_bridge_name);
             br_delif(old_bridge_name, mb->if_name);
         }
-        br_addif(hapd->iconf->parking_vlan, mb->if_name);
+        br_addif(hapd->iconf->mab_bridge, mb->if_name);
         set_interface_isolated(mb->if_index);
     }
 }
@@ -370,12 +370,12 @@ int request_mac(struct hostapd_data *hapd)
     {
         if (!it->valid)
         {
-            int prk_index = if_nametoindex(hapd->iconf->parking_vlan);
-            //move the port in the parking_vlan only if if was learnt and removed from any other bridge
-            //if the MAC expired from the parking_vlan, this is normal, as it was likely moved to a new vlan
+            int prk_index = if_nametoindex(hapd->iconf->mab_bridge);
+            //move the port in the mab_bridge only if if was learnt and removed from any other bridge
+            //if the MAC expired from the mab_bridge, this is normal, as it was likely moved to a new vlan
             if (it->br_ifindex != prk_index)
             {
-                move_to_bridge(it->ifindex, hapd->iconf->parking_vlan);
+                move_to_bridge(it->ifindex, hapd->iconf->mab_bridge);
                 ap_sta_disconnect(hapd, NULL, it->mac, WLAN_REASON_DEAUTH_LEAVING);
             }
             dl_list_del(&it->list);

@@ -2129,7 +2129,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		if (sta->vlan_id > 0) {
 			move_to_vlan(sta->ifindex, sta->vlan_id);
 		} else {
-			wpa_printf(MSG_DEBUG, "MAB: No VLAN information received from RADIUS! Port will be left in the parking_vlan!");
+			wpa_printf(MSG_DEBUG, "MAB: No VLAN information received from RADIUS! Port will be left in the mab_bridge!");
 		}
 #endif /* CONFIG_ENABLE_MAB */
 #endif /* CONFIG_NO_VLAN */
@@ -2180,7 +2180,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			ap_sta_set_authorized(hapd, sta, 0);
 		}
 
-		move_to_bridge(sta->ifindex, hapd->iconf->parking_vlan);
+		move_to_bridge(sta->ifindex, hapd->iconf->mab_bridge);
 #endif /* CONFIG_ENABLE_MAB */
 
 		break;
