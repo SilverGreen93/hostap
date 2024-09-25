@@ -376,6 +376,7 @@ int request_mac(struct hostapd_data *hapd)
             if (it->br_ifindex != prk_index)
             {
                 move_to_bridge(it->ifindex, hapd->iconf->parking_vlan);
+                ap_sta_disconnect(hapd, NULL, it->mac, WLAN_REASON_DEAUTH_LEAVING);
             }
             dl_list_del(&it->list);
             free(it);
