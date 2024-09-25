@@ -2183,7 +2183,6 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		move_to_bridge(sta->ifindex, hapd->iconf->parking_vlan);
 #endif /* CONFIG_ENABLE_MAB */
 
-		sm->eap_if->aaaEapReq = true;
 		break;
 	case RADIUS_CODE_ACCESS_CHALLENGE:
 		sm->eap_if->aaaEapReq = true;
