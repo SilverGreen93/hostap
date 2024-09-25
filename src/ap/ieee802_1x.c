@@ -2099,7 +2099,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 #ifndef CONFIG_NO_VLAN
 #ifdef CONFIG_ENABLE_MAB
 		if (sm->is_mab_auth) {
-			ap_sta_set_authorized_flag(hapd, sta, 1);
+			ap_sta_set_authorized(hapd, sta, 1);
 		}
 #endif /* CONFIG_ENABLE_MAB */
 
@@ -2177,7 +2177,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 
 #ifdef CONFIG_ENABLE_MAB
 		if (sm->is_mab_auth) {
-			ap_sta_set_authorized_flag(hapd, sta, 0);
+			ap_sta_set_authorized(hapd, sta, 0);
 		}
 
 		move_to_bridge(sta->ifindex, hapd->iconf->parking_vlan);
