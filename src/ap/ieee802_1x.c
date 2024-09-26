@@ -2131,6 +2131,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			br_name = hostapd_get_vlan_id_ifname(hapd->conf->vlan, sta->vlan_id);
 			if (br_name) {
 				move_to_bridge(sta->ifindex, br_name);
+				add_vid_to_ifindex(sta->ifindex, sta->vlan_id);
 			} else {
 				wpa_printf(MSG_ERROR, "MAB: No bridge configured for VLAN %d in the vlan_file!", sta->vlan_id);
 			}

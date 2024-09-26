@@ -91,6 +91,66 @@ int move_to_bridge(int if_index, const char *new_bridge)
     return 0;
 }
 
+void add_vid_to_ifindex(int ifindex, int vid) {
+    struct {
+        struct nlmsghdr nlh;
+        struct ifinfomsg ifi;
+        char buf[1024];
+    } req;
+
+    struct rtattr *rta;
+    int sock_fd, len;
+    struct sockaddr_nl sa;
+
+    // Create a socket
+    sock_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+    if (sock_fd < 0) {
+        perror("socket");
+        exit(EXIT_FAILURE);
+    }
+
+    memset(&sa, 0, sizeof(sa));
+    sa.nl_family = AF_NETLINK;
+
+    if (bind(sock_fd, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
+        perror("bind");
+        close(sock_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    memset(&req, 0, sizeof(req));
+    req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
+    req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
+    req.nlh.nlmsg_type = RTM_SETLINK;
+    req.ifi.ifi_family = AF_BRIDGE;
+    req.ifi.ifi_index = ifindex;
+
+    rta = (struct rtattr *)(((char *)&req) + NLMSG_ALIGN(req.nlh.nlmsg_len));
+    rta->rta_type = IFLA_AF_SPEC;
+    rta->rta_len = RTA_LENGTH(0);
+
+    struct rtattr *nested_rta = (struct rtattr *)(((char *)rta) + RTA_ALIGN(rta->rta_len));
+    nested_rta->rta_type = IFLA_BRIDGE_VLAN_INFO;
+    nested_rta->rta_len = RTA_LENGTH(sizeof(struct bridge_vlan_info));
+
+    struct bridge_vlan_info vlan_info = {
+        .flags = BRIDGE_VLAN_INFO_PVID | BRIDGE_VLAN_INFO_UNTAGGED,
+        .vid = vid
+    };
+
+    memcpy(RTA_DATA(nested_rta), &vlan_info, sizeof(vlan_info));
+    rta->rta_len = RTA_ALIGN(rta->rta_len) + nested_rta->rta_len;
+    req.nlh.nlmsg_len = NLMSG_ALIGN(req.nlh.nlmsg_len) + rta->rta_len;
+
+    len = send(sock_fd, &req, req.nlh.nlmsg_len, 0);
+    if (len < 0) {
+        perror("send");
+        close(sock_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    close(sock_fd);
+}
 
 int set_interface_isolated(int ifindex)
 {

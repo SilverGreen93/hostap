@@ -2,6 +2,7 @@
 #define MAB_H
 
 #include <linux/rtnetlink.h>
+#include <linux/if_bridge.h>
 
 #include "ap/sta_info.h"
 
