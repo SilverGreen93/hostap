@@ -70,7 +70,7 @@ static void assign_ports_to_parking_vlan(struct hostapd_data *hapd)
 }
 
 
-int move_to_bridge(int if_index, char *new_bridge)
+int move_to_bridge(int if_index, const char *new_bridge)
 {
     char old_bridge[IFNAMSIZ];
     char if_name[IFNAMSIZ];
@@ -89,16 +89,6 @@ int move_to_bridge(int if_index, char *new_bridge)
     }
 
     return 0;
-}
-
-
-int move_to_vlan(int if_index, int vlan_id)
-{
-    char new_bridge[IFNAMSIZ];
-
-    snprintf(new_bridge, sizeof(new_bridge), "br%d", vlan_id);
-
-    return move_to_bridge(if_index, new_bridge);
 }
 
 

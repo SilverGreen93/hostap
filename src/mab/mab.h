@@ -36,8 +36,7 @@ struct mab_interface {
     int if_index;
 };
 
-int move_to_bridge(int if_index, char *new_bridge);
-int move_to_vlan(int if_index, int vlan_id);
+int move_to_bridge(int if_index, const char *new_bridge);
 int set_interface_isolated(int ifindex);
 int add_mab_interface(struct dl_list *list, char *if_name);
 void parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len);
