@@ -38,6 +38,7 @@ struct mab_interface {
 };
 
 int move_to_bridge(int if_index, const char *new_bridge);
+void add_vid_to_ifindex(int ifindex, int vid);
 int set_interface_isolated(int ifindex);
 int add_mab_interface(struct dl_list *list, char *if_name);
 void parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len);
