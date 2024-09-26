@@ -6,10 +6,13 @@
 
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
 
+#include <sys/ioctl.h>
 #include <net/if.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <linux/if_bridge.h>
 
 #include "utils/common.h"
 #include "utils/list.h"
@@ -20,11 +23,122 @@
 #include "eapol_auth/eapol_auth_sm.h"
 #include "eapol_auth/eapol_auth_sm_i.h"
 #include "ap/ieee802_1x.h"
+#include "drivers/linux_ioctl.h"
 
 #include "mab.h"
 
-extern int br_addif(const char *br_name, const char *if_name);
-extern int br_delif(const char *br_name, const char *if_name);
+
+static int br_delif(const char *br_name, const char *if_name)
+{
+	int fd;
+	struct ifreq ifr;
+	unsigned long args[2];
+	int if_index;
+
+	wpa_printf(MSG_DEBUG, "VLAN: br_delif(%s, %s)", br_name, if_name);
+	if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		wpa_printf(MSG_ERROR, "VLAN: %s: socket(AF_INET,SOCK_STREAM) "
+			   "failed: %s", __func__, strerror(errno));
+		return -1;
+	}
+
+	if (linux_br_del_if(fd, br_name, if_name) == 0)
+		goto done;
+
+	if_index = if_nametoindex(if_name);
+
+	if (if_index == 0) {
+		wpa_printf(MSG_ERROR, "VLAN: %s: Failure determining "
+			   "interface index for '%s'",
+			   __func__, if_name);
+		close(fd);
+		return -1;
+	}
+
+	args[0] = BRCTL_DEL_IF;
+	args[1] = if_index;
+
+	os_strlcpy(ifr.ifr_name, br_name, sizeof(ifr.ifr_name));
+	ifr.ifr_data = (void *) args;
+
+	if (ioctl(fd, SIOCDEVPRIVATE, &ifr) < 0 && errno != EINVAL) {
+		/* No error if interface already removed. */
+		wpa_printf(MSG_ERROR, "VLAN: %s: ioctl[SIOCDEVPRIVATE,"
+			   "BRCTL_DEL_IF] failed for br_name=%s if_name=%s: "
+			   "%s", __func__, br_name, if_name, strerror(errno));
+		close(fd);
+		return -1;
+	}
+
+done:
+	close(fd);
+	return 0;
+}
+
+
+/*
+	Add interface 'if_name' to the bridge 'br_name'
+
+	returns -1 on error
+	returns 1 if the interface is already part of the bridge
+	returns 0 otherwise
+*/
+static int br_addif(const char *br_name, const char *if_name)
+{
+	int fd;
+	struct ifreq ifr;
+	unsigned long args[2];
+	int if_index;
+
+	wpa_printf(MSG_DEBUG, "VLAN: br_addif(%s, %s)", br_name, if_name);
+	if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		wpa_printf(MSG_ERROR, "VLAN: %s: socket(AF_INET,SOCK_STREAM) "
+			   "failed: %s", __func__, strerror(errno));
+		return -1;
+	}
+
+	if (linux_br_add_if(fd, br_name, if_name) == 0)
+		goto done;
+	if (errno == EBUSY) {
+		/* The interface is already added. */
+		close(fd);
+		return 1;
+	}
+
+	if_index = if_nametoindex(if_name);
+
+	if (if_index == 0) {
+		wpa_printf(MSG_ERROR, "VLAN: %s: Failure determining "
+			   "interface index for '%s'",
+			   __func__, if_name);
+		close(fd);
+		return -1;
+	}
+
+	args[0] = BRCTL_ADD_IF;
+	args[1] = if_index;
+
+	os_strlcpy(ifr.ifr_name, br_name, sizeof(ifr.ifr_name));
+	ifr.ifr_data = (void *) args;
+
+	if (ioctl(fd, SIOCDEVPRIVATE, &ifr) < 0) {
+		if (errno == EBUSY) {
+			/* The interface is already added. */
+			close(fd);
+			return 1;
+		}
+
+		wpa_printf(MSG_ERROR, "VLAN: %s: ioctl[SIOCDEVPRIVATE,"
+			   "BRCTL_ADD_IF] failed for br_name=%s if_name=%s: "
+			   "%s", __func__, br_name, if_name, strerror(errno));
+		close(fd);
+		return -1;
+	}
+
+done:
+	close(fd);
+	return 0;
+}
 
 
 static void print_mac_address(unsigned char *addr)
