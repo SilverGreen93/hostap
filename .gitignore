@@ -5,7 +5,7 @@ tests/remote/logs
 wpaspy/build
 **/parallel-vm.log
 tags
-build/
+/build
 # clangd commands and cache
 compile_commands.json
 .cache

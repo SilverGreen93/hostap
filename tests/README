@@ -21,7 +21,7 @@ builds.
 
 # Example
 cd build
-./run-build-tests.h
+./run-build-tests.sh
 
 
 Fuzz testing
