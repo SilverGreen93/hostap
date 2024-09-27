@@ -177,8 +177,8 @@ struct eapol_state_machine {
 	bool stopped;
 
 #ifdef CONFIG_ENABLE_MAB
-	bool is_mab_auth;		// mark this state machine to be for MAB authentication
-	bool is_mab_auth_sent;	// keep track if we sent RADIUS request for this MAC
+	bool is_mab_auth;		/* mark this state machine to be for MAB authentication	*/
+	bool is_mab_auth_sent;	/* keep track if we sent RADIUS request for this MAC	*/
 #endif /* CONFIG_ENABLE_MAB */
 };
 

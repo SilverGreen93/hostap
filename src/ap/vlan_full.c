@@ -130,11 +130,7 @@ static int ifconfig_down(const char *if_name)
  */
 #define MAX_BR_PORTS      		256
 
-#ifdef CONFIG_ENABLE_MAB
-int br_delif(const char *br_name, const char *if_name)
-#else
 static int br_delif(const char *br_name, const char *if_name)
-#endif /* CONFIG_ENABLE_MAB */
 {
 	int fd;
 	struct ifreq ifr;
@@ -189,11 +185,7 @@ done:
 	returns 1 if the interface is already part of the bridge
 	returns 0 otherwise
 */
-#ifdef CONFIG_ENABLE_MAB
-int br_addif(const char *br_name, const char *if_name)
-#else
 static int br_addif(const char *br_name, const char *if_name)
-#endif /* CONFIG_ENABLE_MAB */
 {
 	int fd;
 	struct ifreq ifr;

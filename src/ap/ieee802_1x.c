@@ -1177,12 +1177,15 @@ void ieee802_1x_receive(struct hostapd_data *hapd, const u8 *sa, const u8 *buf,
 	if (sta->eapol_sm) {
 		sta->eapol_sm->dot1xAuthLastEapolFrameVersion = hdr->version;
 		sta->eapol_sm->dot1xAuthEapolFramesRx++;
+#ifdef CONFIG_ENABLE_MAB
 		sta->eapol_sm->is_mab_auth = false; //ensure that if a new eapol is received after a mab request, it can be re-authorized.
 		sta->eapol_sm->eap_if->eap_mab_resp = false;
+#endif /* CONFIG_ENABLE_MAB */
 	}
 
+#ifdef CONFIG_ENABLE_MAB
 	sta->ifindex = if_nametoindex(hapd->conf->iface); // add ifindex to be able to move to the required vlan
-
+#endif /* CONFIG_ENABLE_MAB */
 	key = (struct ieee802_1x_eapol_key *) (hdr + 1);
 	if (datalen >= sizeof(struct ieee802_1x_eapol_key) &&
 	    hdr->type == IEEE802_1X_TYPE_EAPOL_KEY &&
@@ -2050,13 +2053,17 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 	}
 	sta = sm->sta;
 
+#ifdef CONFIG_ENABLE_MAB
 	if (!sm->is_mab_auth) {
-	if (radius_msg_verify(msg, shared_secret, shared_secret_len, req, 1)) {
-		wpa_printf(MSG_INFO,
-			   "Incoming RADIUS packet did not have correct Message-Authenticator - dropped");
-		return RADIUS_RX_INVALID_AUTHENTICATOR;
+#endif /* CONFIG_ENABLE_MAB */
+		if (radius_msg_verify(msg, shared_secret, shared_secret_len, req, 1)) {
+			wpa_printf(MSG_INFO,
+				"Incoming RADIUS packet did not have correct Message-Authenticator - dropped");
+			return RADIUS_RX_INVALID_AUTHENTICATOR;
+		}
+#ifdef CONFIG_ENABLE_MAB
 	}
-	}
+#endif /* CONFIG_ENABLE_MAB */
 
 	if (hdr->code != RADIUS_CODE_ACCESS_ACCEPT &&
 	    hdr->code != RADIUS_CODE_ACCESS_REJECT &&
@@ -2159,12 +2166,16 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			ap_sta_no_session_timeout(hapd, sta);
 
 		sm->eap_if->aaaSuccess = true;
+#ifdef CONFIG_ENABLE_MAB
 		if (sm->is_mab_auth) {
 			sm->eap_if->eap_mab_resp = true;
 		}
+#endif /* CONFIG_ENABLE_MAB */
 
 		override_eapReq = 1;
+#ifdef CONFIG_ENABLE_MAB
 		if (!sm->is_mab_auth) {
+#endif /* CONFIG_ENABLE_MAB */
 			ieee802_1x_get_keys(hapd, sta, msg, req, shared_secret,
 						shared_secret_len);
 			ieee802_1x_store_radius_class(hapd, sta, msg);
@@ -2173,7 +2184,9 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			ieee802_1x_check_hs20(hapd, sta, msg,
 						session_timeout_set ?
 						(int) session_timeout : -1);
+#ifdef CONFIG_ENABLE_MAB
 		}
+#endif /* CONFIG_ENABLE_MAB */
 		break;
 	case RADIUS_CODE_ACCESS_REJECT:
 		sm->eap_if->aaaFail = true;
@@ -2215,9 +2228,14 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		break;
 	}
 
+#ifdef CONFIG_ENABLE_MAB
 	if (!sm->is_mab_auth) {
+#endif /* CONFIG_ENABLE_MAB */
 		ieee802_1x_decapsulate_radius(hapd, sta);
+#ifdef CONFIG_ENABLE_MAB
 	}
+#endif /* CONFIG_ENABLE_MAB */
+
 	if (override_eapReq)
 		sm->eap_if->aaaEapReq = false;
 

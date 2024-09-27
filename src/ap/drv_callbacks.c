@@ -47,6 +47,7 @@
 #include "mab/mab.h"
 #endif /* CONFIG_ENABLE_MAB */
 
+
 #ifdef CONFIG_FILS
 void hostapd_notify_assoc_fils_finish(struct hostapd_data *hapd,
 				      struct sta_info *sta)

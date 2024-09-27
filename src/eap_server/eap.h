@@ -47,7 +47,8 @@ struct eap_eapol_interface {
 	/* Lower layer to full authenticator variables */
 	bool eapResp; /* shared with EAPOL Backend Authentication */
 #ifdef CONFIG_ENABLE_MAB
-	bool eap_mab_resp;
+	bool eap_mab_resp; 	/* used to signal that a reply has come from Radius, and we don't 	*/
+						/* need any EAP challenge, just transition the state to SUCCESS2 	*/
 #endif /* CONFIG_ENABLE_MAB */
 	struct wpabuf *eapRespData;
 	bool portEnabled;
