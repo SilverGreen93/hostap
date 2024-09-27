@@ -2126,7 +2126,11 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 							vlan_desc.tagged);
 		sta->vlan_id = vlan_desc.untagged;
 
-		if (sta->vlan_id > 0) {
+		if (sta->vlan_id >= 0) {
+			if (sta->vlan_id == 0) {
+				wpa_printf(MSG_DEBUG, "MAB: No VLAN information received from RADIUS!");
+				sta->vlan_id = 1; //put in VLAN 1
+			}
 			const char *br_name;
 			br_name = hostapd_get_vlan_id_ifname(hapd->conf->vlan, sta->vlan_id);
 			if (br_name) {
@@ -2136,7 +2140,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 				wpa_printf(MSG_ERROR, "MAB: No bridge configured for VLAN %d in the vlan_file!", sta->vlan_id);
 			}
 		} else {
-			wpa_printf(MSG_DEBUG, "MAB: No VLAN information received from RADIUS! Port will be left in the mab_bridge!");
+			wpa_printf(MSG_DEBUG, "MAB: Error getting VLAN ID!");
 		}
 #endif /* CONFIG_ENABLE_MAB */
 #endif /* CONFIG_NO_VLAN */
