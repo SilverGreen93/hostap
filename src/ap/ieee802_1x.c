@@ -2205,6 +2205,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		}
 
 		move_to_bridge(sta->ifindex, hapd->iconf->mab_bridge);
+		set_interface_isolated(sta->ifindex);
 #endif /* CONFIG_ENABLE_MAB */
 
 		break;
