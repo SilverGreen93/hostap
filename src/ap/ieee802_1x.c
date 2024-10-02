@@ -2126,28 +2126,30 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			break;
 
 #ifdef CONFIG_ENABLE_MAB
-		struct vlan_description vlan_desc;
-		os_memset(&vlan_desc, 0, sizeof(vlan_desc));
-		vlan_desc.notempty = !!radius_msg_get_vlanid(msg, &vlan_desc.untagged,
-							MAX_NUM_TAGGED_VLAN,
-							vlan_desc.tagged);
-		sta->vlan_id = vlan_desc.untagged;
+		if (!strcmp(hapd->driver->name, "wired")) {
+			struct vlan_description vlan_desc;
+			os_memset(&vlan_desc, 0, sizeof(vlan_desc));
+			vlan_desc.notempty = !!radius_msg_get_vlanid(msg, &vlan_desc.untagged,
+								MAX_NUM_TAGGED_VLAN,
+								vlan_desc.tagged);
+			sta->vlan_id = vlan_desc.untagged;
 
-		if (sta->vlan_id >= 0) {
-			if (sta->vlan_id == 0) {
-				wpa_printf(MSG_DEBUG, "MAB: No VLAN information received from RADIUS!");
-				sta->vlan_id = 1; //put in VLAN 1
-			}
-			const char *br_name;
-			br_name = hostapd_get_vlan_id_ifname(hapd->conf->vlan, sta->vlan_id);
-			if (br_name) {
-				move_to_bridge(sta->ifindex, br_name);
-				add_vid_to_ifindex(sta->ifindex, sta->vlan_id);
+			if (sta->vlan_id >= 0) {
+				if (sta->vlan_id == 0) {
+					wpa_printf(MSG_DEBUG, "MAB: No VLAN information received from RADIUS!");
+					sta->vlan_id = 1; //put in VLAN 1
+				}
+				const char *br_name;
+				br_name = hostapd_get_vlan_id_ifname(hapd->conf->vlan, sta->vlan_id);
+				if (br_name) {
+					move_to_bridge(sta->ifindex, br_name);
+					add_vid_to_ifindex(sta->ifindex, sta->vlan_id);
+				} else {
+					wpa_printf(MSG_ERROR, "MAB: No bridge configured for VLAN %d in the vlan_file!", sta->vlan_id);
+				}
 			} else {
-				wpa_printf(MSG_ERROR, "MAB: No bridge configured for VLAN %d in the vlan_file!", sta->vlan_id);
+				wpa_printf(MSG_DEBUG, "MAB: Error getting VLAN ID!");
 			}
-		} else {
-			wpa_printf(MSG_DEBUG, "MAB: Error getting VLAN ID!");
 		}
 #endif /* CONFIG_ENABLE_MAB */
 #endif /* CONFIG_NO_VLAN */
@@ -2204,8 +2206,10 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			ap_sta_set_authorized(hapd, sta, 0);
 		}
 
-		move_to_bridge(sta->ifindex, hapd->iconf->mab_bridge);
-		set_interface_isolated(sta->ifindex);
+		if (!strcmp(hapd->driver->name, "wired")) {
+			move_to_bridge(sta->ifindex, hapd->iconf->mab_bridge);
+			set_interface_isolated(sta->ifindex);
+		}
 #endif /* CONFIG_ENABLE_MAB */
 
 		break;
