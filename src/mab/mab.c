@@ -141,26 +141,13 @@ done:
 }
 
 
-static void print_mac_address(unsigned char *addr)
-{
-    for (int i = 0; i < 6; i++)
-    {
-        if (i > 0)
-            printf(":");
-        printf("%02x", addr[i]);
-    }
-    printf("\n");
-}
-
-
-static void print_list(struct dl_list *head)
+static void print_mac_list(struct dl_list *head)
 {
     struct learned_mac *t;
-    dl_list_for_each(t, head, struct learned_mac, list)
-        printf("%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx (%d) ",
-               t->mac[0], t->mac[1], t->mac[2], t->mac[3], t->mac[4], t->mac[5], t->valid);
+    wpa_printf(MSG_MSGDUMP, "MAB: Currently learnt MACs (%d):", dl_list_len(head));
 
-    printf("\n(len=%d%s)\n", dl_list_len(head), dl_list_empty(head) ? " empty" : "");
+    dl_list_for_each(t, head, struct learned_mac, list)
+        wpa_printf(MSG_MSGDUMP, "MAB: -> " MACSTR " (%d)", MAC2STR(t->mac), t->valid);
 }
 
 
@@ -477,8 +464,7 @@ int request_mac(struct hostapd_data *hapd)
                     addr = (unsigned char *)RTA_DATA(tb[NDA_LLADDR]);
                     addr_len = RTA_PAYLOAD(tb[NDA_LLADDR]);
 
-                    printf(">>>>>>>> Bridge: %s (%d), IF: %s (%d) MAC Address: ", master_name, master_index, if_name, if_index);
-                    print_mac_address(addr);
+                    wpa_printf(MSG_DEBUG, "MAB: MAC: Bridge: %s (%d), IF: %s (%d) MAC Address: " MACSTR, master_name, master_index, if_name, if_index, MAC2STR(addr));
 
                     dl_list_for_each(it, &hapd->iconf->learned_mac_list, struct learned_mac, list)
                     {
@@ -514,7 +500,7 @@ int request_mac(struct hostapd_data *hapd)
                 }
                 else
                 {
-                    printf(">>>>>>>>> Skipping bridge ifindex = %d\n", master_index);
+                    wpa_printf(MSG_DEBUG, "MAB: Skipping bridge ifindex = %d\n", master_index);
                 }
             }
         }
@@ -527,8 +513,7 @@ int request_mac(struct hostapd_data *hapd)
     // }
     //}
 
-    wpa_printf(MSG_INFO, "MAB: Currently learnt MACs:");
-    print_list(&hapd->iconf->learned_mac_list);
+    print_mac_list(&hapd->iconf->learned_mac_list);
 
     dl_list_for_each_safe(it, tmp, &hapd->iconf->learned_mac_list, struct learned_mac, list)
     {
@@ -673,17 +658,17 @@ void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta)
 		sta->addr[0], sta->addr[1], sta->addr[2], sta->addr[3], sta->addr[4], sta->addr[5]);
     identity_len = strlen(identity);
     
-	wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: pachet RADIUS MAB pt: %s", identity);
+	wpa_printf(MSG_DEBUG, "MAB: Create RADIUS request for: %s", identity);
 
     sm->radius_identifier = radius_client_get_id(hapd->radius);
     msg = radius_msg_new(RADIUS_CODE_ACCESS_REQUEST, sm->radius_identifier);
     if (!msg) {
-		wpa_printf(MSG_INFO, "MIHAI: Could not create new RADIUS packet");
+		wpa_printf(MSG_INFO, "MAB: Could not create new RADIUS packet");
 		return;
 	}
 
     if (radius_msg_make_authenticator(msg) < 0) {
-		wpa_printf(MSG_INFO, "MIHAI: Could not make Request Authenticator");
+		wpa_printf(MSG_INFO, "MAB: Could not make Request Authenticator");
 		goto fail;
 	}
 
@@ -691,7 +676,7 @@ void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta)
 		goto fail;
 
 	if (!radius_msg_add_attr(msg, RADIUS_ATTR_USER_NAME, (u8 *)identity, identity_len)) {
-		wpa_printf(MSG_INFO, "MIHAI: Could not add User-Name");
+		wpa_printf(MSG_INFO, "MAB: Could not add User-Name");
 		goto fail;
 	}
 
@@ -699,7 +684,7 @@ void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta)
 		    msg, (u8 *)identity, identity_len,
             hapd->conf->radius->auth_server->shared_secret,
             hapd->conf->radius->auth_server->shared_secret_len)) {
-		wpa_printf(MSG_INFO, "MIHAI: Could not add User-Password");
+		wpa_printf(MSG_INFO, "MAB: Could not add User-Password");
 		goto fail;
     }
 
@@ -712,17 +697,17 @@ void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta)
 
 	if (!hostapd_config_get_radius_attr(hapd->conf->radius_auth_req_attr, RADIUS_ATTR_FRAMED_MTU) &&
 	    !radius_msg_add_attr_int32(msg, RADIUS_ATTR_FRAMED_MTU, 1400)) {
-		wpa_printf(MSG_INFO, "MIHAI: Could not add Framed-MTU");
+		wpa_printf(MSG_INFO, "MAB: Could not add Framed-MTU");
 		goto fail;
 	}
 
 	if (radius_client_send(hapd->radius, msg, RADIUS_AUTH, sta->addr) < 0)
 		goto fail;
-    wpa_printf(MSG_DEBUG, ">>>>>>>>>>>>>>>>>>>>> MIHAI: Trimis mesaj la RADIUS");
+    wpa_printf(MSG_DEBUG, "MAB: Sent RADIUS request");
 
 	return;
 
 fail:
-    wpa_printf(MSG_INFO, ">>>>>>>>>>>>>>>>>>>>> MIHAI: FAIL");
+    wpa_printf(MSG_ERROR, "MAB: Send RADIUS request FAILED");
 	radius_msg_free(msg);
 }
