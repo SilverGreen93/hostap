@@ -1,0 +1,59 @@
+Use the instructions below to make an Ubuntu 20.04.6 LTS test VM from scratch.
+The instructions were adapted from the older example-setup.txt and README files
+and were validated with hostapd pre-release version 2.12.
+-------------------------------------------------------------------------------
+
+1. Install the required build packages and make a test build
+$ sudo apt install git python3 python3-pip net-tools libsqlite3-dev libcurl4-gnutls-dev libnl-3-dev libnl-genl-3-dev libnl-route-3-dev binutils-dev libpcap-dev build-essential libssl-dev libiberty-dev libdbus-1-dev iw bridge-utils tshark python-netifaces libgcrypt20-dev libgnutls28-dev libpcsclite-dev libxml2-dev
+$ ../build/run-build-tests.sh
+
+2. Make sure you have the correct python3 and iw versions
+$ python3 --version
+Should be at least 3.8.0
+
+$ iw --version
+Should be at least 3.17
+
+3. Install the required python packages for both the current user and root
+python3 -m pip install pyrad
+python3 -m pip install pycryptodome
+python3 -m pip install pycryptodomex
+sudo python3 -m pip install pyrad
+sudo python3 -m pip install pycryptodome
+sudo python3 -m pip install pycryptodomex
+
+4. Disable the rkfill and wpa_supplicant services
+systemctl mask systemd-rfkill.service
+systemctl stop wpa_supplicant.service
+systemctl disable wpa_supplicant.service
+
+5. Increase the default timeout for sudo password prompt
+$ sudo visudo
+Defaults        env_reset,timestamp_timeout=180
+
+6. Tell NetworkManager to leave alone the hwsim wlan interfaces by adding the unmanaged-devices
+$ sudo vim /etc/NetworkManager/NetworkManager.conf
+[keyfile]
+unmanaged-devices=mac:02:00:00:00:00:00;mac:02:00:00:00:01:00;mac:02:00:00:00:02:00;mac:02:00:00:00:03:00;mac:02:00:00:00:04:00
+
+7. Start a simple test to make sure it passes
+./build.sh
+./start.sh
+sudo ./run-tests.py ap_open
+./stop.sh
+
+Notes:
+a) On subsequent builds, the .config files for hostapd and wpa_supplicant are not overwritten, so you are free to add any additional defines and re-run ./build.sh
+
+b) Sometimes the cleanup does not kill all processes, leaving running processes or zombies. Make sure you kill them manually.
+ps aux | grep hostapd
+ps aux | grep wpa_supplicant
+sudo killall hostapd
+sudo killall wpa_supplicant
+
+c) Because the tests are ran as root, the logs do not have permissions for the current user. Make sure you set the permissions.
+$ sudo chown -R user:user logs
+
+d) You can start multiple test suites by specifying the test file(s) using -f as a parameter for ./run-tests.py, or just multiple individual tests by enumerating them directly.
+sudo ./run-tests.py -f radius ap_eap
+sudo ./run-tests.py ap_open radius_macacl
