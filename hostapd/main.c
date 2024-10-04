@@ -383,6 +383,9 @@ hostapd_interface_init(struct hapd_interfaces *interfaces, const char *if_name,
 	}
 
 	if (iface->conf->bss[0]->iface[0] == '\0' &&
+#ifdef CONFIG_ENABLE_MAB
+		dl_list_empty(&iface->conf->mab_interfaces) &&
+#endif /* CONFIG_ENABLE_MAB */
 	    !hostapd_drv_none(iface->bss[0])) {
 		wpa_printf(MSG_ERROR,
 			   "Interface name not specified in %s, nor by '-i' parameter",

@@ -348,11 +348,6 @@ static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 		   sizeof(drv->common.ifname));
 	drv->use_pae_group_addr = params->use_pae_group_addr;
 
-	if (wired_init_sockets(drv, params->own_addr)) {
-		os_free(drv);
-		return NULL;
-	}
-
 #ifdef CONFIG_ENABLE_MAB
 	if (!dl_list_empty(&hapd->iconf->mab_interfaces)) {
 		if (pthread_create(&thread, NULL, mac_learn_thread, hapd) != 0) {
@@ -361,9 +356,22 @@ static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 			return NULL;
 		}
 	} else {
-		wpa_printf(MSG_INFO, "MAB: configuration is missing, starting only EAPOL authentication");
+		wpa_printf(MSG_INFO,
+			   "MAB: configuration is missing, starting in EAPOL mode");
 	}
+
+	if (hapd->conf->iface[0] == '\0' &&
+		   !dl_list_empty(&hapd->iconf->mab_interfaces)) {
+		strncpy(hapd->conf->iface, hapd->iconf->mab_bridge, IFNAMSIZ + 1);
+		params->ifname = hapd->conf->iface;
+		wpa_printf(MSG_INFO,
+			   "MAB: EAPOL interface is missing, starting in MAB mode");
+	} else
 #endif /* CONFIG_ENABLE_MAB */
+	if (wired_init_sockets(drv, params->own_addr)) {
+		os_free(drv);
+		return NULL;
+	}
 
 	return drv;
 }
