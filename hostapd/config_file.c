@@ -2468,7 +2468,17 @@ static bool get_hexstream(const char *val, struct wpabuf **var,
 static void parse_mab_interfaces(char *intf, struct hostapd_config *conf)
 {
 	char *token;
+	struct mab_interface *it, *tmp;
+
 	wpa_printf(MSG_INFO, "MAB: Initialize interfaces: %s", intf);
+
+	dl_list_for_each_safe(it, tmp, &conf->mab_interfaces, struct mab_interface, list)
+    {
+		dl_list_del(&it->list);
+		free(it);
+    }
+
+	dl_list_init(&conf->mab_interfaces);
 
 	token = strtok(intf, ",");
 
