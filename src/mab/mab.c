@@ -155,7 +155,7 @@ static void assign_ports_to_parking_vlan(struct hostapd_data *hapd)
 {
     struct mab_interface *mb;
     int old_bridge_index;
-    char old_bridge_name[IFNAMSIZ];
+    char old_bridge_name[IFNAMSIZ + 1];
 
     dl_list_for_each(mb, &hapd->iconf->mab_interfaces, struct mab_interface, list)
     {
@@ -173,8 +173,8 @@ static void assign_ports_to_parking_vlan(struct hostapd_data *hapd)
 
 int move_to_bridge(int if_index, const char *new_bridge)
 {
-    char old_bridge[IFNAMSIZ];
-    char if_name[IFNAMSIZ];
+    char old_bridge[IFNAMSIZ + 1];
+    char if_name[IFNAMSIZ + 1];
     int old_index;
     int new_index;
 

@@ -33,7 +33,7 @@ struct learned_mac {
 
 struct mab_interface {
     struct dl_list list;
-    char if_name[IFNAMSIZ];
+    char if_name[IFNAMSIZ + 1];
     int if_index;
 };
 
