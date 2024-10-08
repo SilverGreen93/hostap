@@ -2142,8 +2142,10 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 				const char *br_name;
 				br_name = hostapd_get_vlan_id_ifname(hapd->conf->vlan, sta->vlan_id);
 				if (br_name) {
-					move_to_bridge(sta->ifindex, br_name);
-					add_vid_to_ifindex(sta->ifindex, sta->vlan_id);
+					if (hapd->iconf->dynamic_assignment) {
+						move_to_bridge(sta->ifindex, br_name);
+						add_vid_to_ifindex(sta->ifindex, sta->vlan_id);
+					}
 				} else {
 					wpa_printf(MSG_ERROR, "MAB: No bridge configured for VLAN %d in the vlan_file!", sta->vlan_id);
 				}
@@ -2207,7 +2209,9 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		}
 
 		if (!strcmp(hapd->driver->name, "wired")) {
-			move_to_bridge(sta->ifindex, hapd->iconf->mab_bridge);
+			if (hapd->iconf->dynamic_assignment) {
+				move_to_bridge(sta->ifindex, hapd->iconf->mab_bridge);
+			}
 			set_interface_isolated(sta->ifindex);
 		}
 #endif /* CONFIG_ENABLE_MAB */

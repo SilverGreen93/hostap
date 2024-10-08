@@ -2502,6 +2502,8 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		parse_mab_interfaces(pos, conf);
 	} else if (os_strcmp(buf, "mab_bridge") == 0) {
 		os_strlcpy(conf->mab_bridge, pos, sizeof(conf->mab_bridge));
+	} else if (os_strcmp(buf, "dynamic_assignment") == 0) {
+		conf->dynamic_assignment = atoi(pos);
 #endif /* CONFIG_ENABLE_MAB */
 	} else if (os_strcmp(buf, "bridge") == 0) {
 		os_strlcpy(bss->bridge, pos, sizeof(bss->bridge));
