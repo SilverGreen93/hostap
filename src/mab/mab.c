@@ -526,6 +526,7 @@ int request_mac(struct hostapd_data *hapd)
             {
                 move_to_bridge(it->ifindex, hapd->iconf->mab_bridge);
                 ap_sta_disconnect(hapd, NULL, it->mac, WLAN_REASON_DEAUTH_LEAVING);
+                set_interface_isolated(it->ifindex);
             }
             dl_list_del(&it->list);
             free(it);
