@@ -423,101 +423,97 @@ int request_mac(struct hostapd_data *hapd)
     dl_list_for_each(it, &hapd->iconf->learned_mac_list, struct learned_mac, list)
         it->valid = 0;
 
-    // while (1) {
-    len = recv(sockfd, buf, sizeof(buf), 0);
-    if (len < 0)
+    while (1)
     {
-        perror("recv");
-        close(sockfd);
-        return -1;
-    }
-
-    for (nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, len); nh = NLMSG_NEXT(nh, len))
-    {
-        if (nh->nlmsg_type == NLMSG_DONE)
-            break;
-        if (nh->nlmsg_type == NLMSG_ERROR)
+        len = recv(sockfd, buf, sizeof(buf), 0);
+        if (len < 0)
         {
-            fprintf(stderr, "Error in netlink message\n");
+            perror("recv");
             close(sockfd);
             return -1;
         }
 
-        ndm = NLMSG_DATA(nh);
-        rta = (struct rtattr *)((char *)ndm + NLMSG_ALIGN(sizeof(struct ndmsg)));
-        int rta_len = nh->nlmsg_len - NLMSG_LENGTH(sizeof(struct ndmsg));
-        struct rtattr *tb[NDA_MAX + 1];
-        parse_rtattr(tb, NDA_MAX, rta, rta_len);
-
-        if (tb[NDA_LLADDR] && tb[NDA_MASTER] && (ndm->ndm_state & NUD_REACHABLE))
+        for (nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, len); nh = NLMSG_NEXT(nh, len))
         {
-            int master_index = *(int *)RTA_DATA(tb[NDA_MASTER]);
-            int if_index = ndm->ndm_ifindex;
-            char master_name[IF_NAMESIZE];
-            char if_name[IF_NAMESIZE];
-            if_indextoname(master_index, master_name);
-            if_indextoname(if_index, if_name);
-            if (master_index && if_index)
+            if (nh->nlmsg_type == NLMSG_DONE)
+                goto parsing_done;
+            if (nh->nlmsg_type == NLMSG_ERROR)
             {
-                // learn mac only if the ifindex of the port is in the configured ports list
-                if (list_contains_interface(&hapd->iconf->mab_interfaces, if_index))
+                fprintf(stderr, "Error in netlink message\n");
+                close(sockfd);
+                return -1;
+            }
+
+            ndm = NLMSG_DATA(nh);
+            rta = (struct rtattr *)((char *)ndm + NLMSG_ALIGN(sizeof(struct ndmsg)));
+            int rta_len = nh->nlmsg_len - NLMSG_LENGTH(sizeof(struct ndmsg));
+            struct rtattr *tb[NDA_MAX + 1];
+            parse_rtattr(tb, NDA_MAX, rta, rta_len);
+
+            if (tb[NDA_LLADDR] && tb[NDA_MASTER] && (ndm->ndm_state & NUD_REACHABLE))
+            {
+                int master_index = *(int *)RTA_DATA(tb[NDA_MASTER]);
+                int if_index = ndm->ndm_ifindex;
+                char master_name[IF_NAMESIZE];
+                char if_name[IF_NAMESIZE];
+                if_indextoname(master_index, master_name);
+                if_indextoname(if_index, if_name);
+                if (master_index && if_index)
                 {
-                    unsigned char *addr;
-                    int addr_len;
-                    int found = 0;
-
-                    addr = (unsigned char *)RTA_DATA(tb[NDA_LLADDR]);
-                    addr_len = RTA_PAYLOAD(tb[NDA_LLADDR]);
-
-                    wpa_printf(MSG_DEBUG, "MAB: MAC: Bridge: %s (%d), IF: %s (%d) MAC Address: " MACSTR, master_name, master_index, if_name, if_index, MAC2STR(addr));
-
-                    dl_list_for_each(it, &hapd->iconf->learned_mac_list, struct learned_mac, list)
+                    // learn mac only if the ifindex of the port is in the configured ports list
+                    if (list_contains_interface(&hapd->iconf->mab_interfaces, if_index))
                     {
-                        found = 0;
-                        if (memcmp(it->mac, addr, addr_len) == 0)
+                        unsigned char *addr;
+                        int addr_len;
+                        int found = 0;
+
+                        addr = (unsigned char *)RTA_DATA(tb[NDA_LLADDR]);
+                        addr_len = RTA_PAYLOAD(tb[NDA_LLADDR]);
+
+                        wpa_printf(MSG_DEBUG, "MAB: MAC: Bridge: %s (%d), IF: %s (%d) MAC Address: " MACSTR, master_name, master_index, if_name, if_index, MAC2STR(addr));
+
+                        dl_list_for_each(it, &hapd->iconf->learned_mac_list, struct learned_mac, list)
                         {
-                            found = 1;
-                            it->valid = 1;
-                            it->ifindex = if_index; // in varianta in care actualizam aici, nu se mai re-trimite la radius request cind se muta pe noul bridge
-                            it->br_ifindex = master_index;
-                            break;
+                            found = 0;
+                            if (memcmp(it->mac, addr, addr_len) == 0)
+                            {
+                                found = 1;
+                                it->valid = 1;
+                                it->ifindex = if_index; // in varianta in care actualizam aici, nu se mai re-trimite la radius request cind se muta pe noul bridge
+                                it->br_ifindex = master_index;
+                                break;
+                            }
+                        }
+
+                        if (!found)
+                        {
+                            struct learned_mac *new_mac;
+                            new_mac = (struct learned_mac *)malloc(sizeof(struct learned_mac));
+                            memcpy(new_mac->mac, addr, addr_len);
+                            new_mac->ifindex = if_index;
+                            new_mac->br_ifindex = master_index;
+                            new_mac->valid = 1;
+                            dl_list_add(&hapd->iconf->learned_mac_list, &new_mac->list);
+
+                            // apelez eveniment de new mac
+                            union wpa_event_data event;
+                            os_memset(&event, 0, sizeof(event));
+                            event.new_sta.addr = addr;
+                            event.new_sta.ifindex = if_index;
+                            wpa_supplicant_event(hapd, EVENT_NEW_STA, &event);
+                            wpa_supplicant_event(hapd, EVENT_MAB_RX, &event);
                         }
                     }
-
-                    if (!found)
+                    else
                     {
-                        struct learned_mac *new_mac;
-                        new_mac = (struct learned_mac *)malloc(sizeof(struct learned_mac));
-                        memcpy(new_mac->mac, addr, addr_len);
-                        new_mac->ifindex = if_index;
-                        new_mac->br_ifindex = master_index;
-                        new_mac->valid = 1;
-                        dl_list_add(&hapd->iconf->learned_mac_list, &new_mac->list);
-
-                        // apelez eveniment de new mac
-                        union wpa_event_data event;
-                        os_memset(&event, 0, sizeof(event));
-                        event.new_sta.addr = addr;
-                        event.new_sta.ifindex = if_index;
-                        wpa_supplicant_event(hapd, EVENT_NEW_STA, &event);
-                        wpa_supplicant_event(hapd, EVENT_MAB_RX, &event);
+                        wpa_printf(MSG_DEBUG, "MAB: Skipping bridge ifindex = %d\n", master_index);
                     }
-                }
-                else
-                {
-                    wpa_printf(MSG_DEBUG, "MAB: Skipping bridge ifindex = %d\n", master_index);
                 }
             }
         }
     }
 
-    // if (nh->nlmsg_flags & NLM_F_MULTI) {
-    //     continue;
-    // } else {
-    //     break;
-    // }
-    //}
-
+parsing_done:
     print_mac_list(&hapd->iconf->learned_mac_list);
 
     dl_list_for_each_safe(it, tmp, &hapd->iconf->learned_mac_list, struct learned_mac, list)
