@@ -15,6 +15,10 @@ struct driver_wired_common_data {
 	void *ctx;
 
 	int sock; /* raw packet socket for driver access */
+#ifdef CONFIG_ENABLE_MAB
+	int mab_sock[2]; /* socket for the read/write mab pipe for mac learning */
+	pthread_t mab_thread; /* mac learning thread */
+#endif /* CONFIG_ENABLE_MAB */
 	int pf_sock;
 	int membership, multi, iff_allmulti, iff_up;
 };

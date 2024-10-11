@@ -151,7 +151,7 @@ static void print_mac_list(struct dl_list *head)
 }
 
 
-static void assign_ports_to_parking_vlan(struct hostapd_data *hapd)
+void assign_ports_to_parking_vlan(struct hostapd_data *hapd)
 {
     struct mab_interface *mb;
     int old_bridge_index;
@@ -504,10 +504,6 @@ int request_mac(struct hostapd_data *hapd)
                             wpa_supplicant_event(hapd, EVENT_MAB_RX, &event);
                         }
                     }
-                    else
-                    {
-                        wpa_printf(MSG_DEBUG, "MAB: Skipping bridge ifindex = %d\n", master_index);
-                    }
                 }
             }
         }
@@ -539,27 +535,6 @@ parsing_done:
 
     close(sockfd);
     return 0;
-}
-
-
-void *mac_learn_thread(void *arg)
-{
-    struct hostapd_data *hapd = arg;
-
-    wpa_printf(MSG_INFO, "MAB: Starting MAC learning thread");
-    os_sleep(5, 0);
-    assign_ports_to_parking_vlan(hapd);
-    os_sleep(5, 0);
-
-    dl_list_init(&hapd->iconf->learned_mac_list);
-
-    while (1)
-    {
-        request_mac(hapd);
-        os_sleep(10, 0);
-    }
-
-    return NULL;
 }
 
 

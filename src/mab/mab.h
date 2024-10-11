@@ -37,6 +37,7 @@ struct mab_interface {
     int if_index;
 };
 
+void assign_ports_to_parking_vlan(struct hostapd_data *hapd);
 int move_to_bridge(int if_index, const char *new_bridge);
 void add_vid_to_ifindex(int ifindex, int vid);
 int set_interface_isolated(int ifindex);
@@ -44,7 +45,6 @@ int add_mab_interface(struct dl_list *list, char *if_name);
 void parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len);
 int list_contains_interface(struct dl_list *list, int ifindex);
 int request_mac(struct hostapd_data *hapd);
-void* mac_learn_thread(void* arg);
 int get_bridge_index(int ifindex);
 void mab_receive(struct hostapd_data *hapd, const u8 *sa);
 void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta);
