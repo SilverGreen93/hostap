@@ -604,6 +604,11 @@ SM_STEP(BE_AUTH)
 		SM_ENTER(BE_AUTH, IDLE);
 		break;
 	case BE_AUTH_IDLE:
+#ifdef CONFIG_ENABLE_MAB
+		if (sm->is_mab_auth) {
+			sm->authStart = false;
+		} else
+#endif /* CONFIG_ENABLE_MAB */
 		if (sm->eap_if->eapFail && sm->authStart)
 			SM_ENTER(BE_AUTH, FAIL);
 		else if (sm->eap_if->eapReq && sm->authStart)
