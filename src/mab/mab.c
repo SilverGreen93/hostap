@@ -350,6 +350,19 @@ void free_mab_interfaces(struct dl_list *list_pt)
 }
 
 
+void free_learned_mac_list(struct dl_list *list_pt)
+{
+    struct learned_mac *it, *tmp;
+
+    dl_list_for_each_safe(it, tmp, list_pt, struct learned_mac, list)
+    {
+        dl_list_del(&it->list);
+        free(it);
+        it = NULL;
+    }
+}
+
+
 void parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len)
 {
     memset(tb, 0, sizeof(struct rtattr *) * (max + 1));

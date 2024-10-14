@@ -1067,6 +1067,7 @@ void hostapd_config_free(struct hostapd_config *conf)
 
 #ifdef CONFIG_ENABLE_MAB
 	free_mab_interfaces(&conf->mab_interfaces);
+	free_learned_mac_list(&conf->learned_mac_list);
 #endif /* CONFIG_ENABLE_MAB */
 	for (i = 0; i < conf->num_bss; i++)
 		hostapd_config_free_bss(conf->bss[i]);

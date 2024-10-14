@@ -43,6 +43,7 @@ void add_vid_to_ifindex(int ifindex, int vid);
 int set_interface_isolated(int ifindex);
 int add_mab_interface(struct dl_list *list, char *if_name);
 void free_mab_interfaces(struct dl_list *list);
+void free_learned_mac_list(struct dl_list *list_pt);
 void parse_rtattr(struct rtattr *tb[], int max, struct rtattr *rta, int len);
 int list_contains_interface(struct dl_list *list, int ifindex);
 int request_mac(struct hostapd_data *hapd);
