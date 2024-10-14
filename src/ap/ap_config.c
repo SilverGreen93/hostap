@@ -322,6 +322,7 @@ struct hostapd_config * hostapd_config_defaults(void)
 
 #ifdef CONFIG_ENABLE_MAB
 	dl_list_init(&conf->mab_interfaces);
+	dl_list_init(&conf->learned_mac_list);
 #endif /* CONFIG_ENABLE_MAB */
 
 	return conf;

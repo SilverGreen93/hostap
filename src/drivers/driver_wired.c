@@ -102,14 +102,9 @@ void *mac_wakeup_thread(void *arg)
 {
 	char *message = "DING";
 	struct driver_wired_common_data *common = arg;
-	struct hostapd_data *hapd = common->ctx;
 	int sock = common->mab_sock[1];
 
 	wpa_printf(MSG_INFO, "MAB: Starting MAC wakeup thread on socket %d", sock);
-
-	assign_ports_to_parking_vlan(hapd);
-
-	dl_list_init(&hapd->iconf->learned_mac_list);
 
 	while (1)
 	{
@@ -421,6 +416,8 @@ static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 			os_free(drv);
 			return NULL;
 		}
+
+		assign_ports_to_parking_vlan(hapd);
 	} else {
 		wpa_printf(MSG_INFO,
 			   "MAB: configuration is missing, starting in EAPOL mode");
