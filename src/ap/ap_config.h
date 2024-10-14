@@ -484,6 +484,9 @@ struct hostapd_bss_config {
 	int wmm_uapsd;
 
 	struct hostapd_vlan *vlan;
+#ifdef CONFIG_ENABLE_MAB
+	struct hostapd_vlan *mab_vlan; /* keep track of the vlan-bridge associations */
+#endif /* CONFIG_ENABLE_MAB */
 
 	macaddr bssid;
 

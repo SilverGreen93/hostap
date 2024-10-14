@@ -24,12 +24,19 @@
 #include "airtime_policy.h"
 #include "ap_config.h"
 
-
+#ifdef CONFIG_ENABLE_MAB
+static void hostapd_config_free_vlan(struct hostapd_vlan *vlan_pt)
+#else
 static void hostapd_config_free_vlan(struct hostapd_bss_config *bss)
+#endif /* CONFIG_ENABLE_MAB */
 {
 	struct hostapd_vlan *vlan, *prev;
 
+#ifdef CONFIG_ENABLE_MAB
+	vlan = vlan_pt;
+#else
 	vlan = bss->vlan;
+#endif /* CONFIG_ENABLE_MAB */
 	prev = NULL;
 	while (vlan) {
 		prev = vlan;
@@ -37,7 +44,11 @@ static void hostapd_config_free_vlan(struct hostapd_bss_config *bss)
 		os_free(prev);
 	}
 
+#ifdef CONFIG_ENABLE_MAB
+	vlan_pt = NULL;
+#else
 	bss->vlan = NULL;
+#endif /* CONFIG_ENABLE_MAB */
 }
 
 
@@ -879,7 +890,12 @@ void hostapd_config_free_bss(struct hostapd_bss_config *conf)
 	os_free(conf->radius_server_clients);
 	os_free(conf->radius);
 	os_free(conf->radius_das_shared_secret);
+#ifdef CONFIG_ENABLE_MAB
+	hostapd_config_free_vlan(conf->vlan);
+	hostapd_config_free_vlan(conf->mab_vlan);
+#else
 	hostapd_config_free_vlan(conf);
+#endif /* CONFIG_ENABLE_MAB */
 	os_free(conf->time_zone);
 
 #ifdef CONFIG_IEEE80211R_AP

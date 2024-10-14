@@ -30,8 +30,13 @@
 #endif /* CONFIG_ENABLE_MAB */
 
 #ifndef CONFIG_NO_VLAN
+#ifdef CONFIG_ENABLE_MAB
+static int hostapd_config_read_vlan_file(struct hostapd_vlan *vlan_pt,
+					 const char *fname)
+#else
 static int hostapd_config_read_vlan_file(struct hostapd_bss_config *bss,
 					 const char *fname)
+#endif /* CONFIG_ENABLE_MAB */
 {
 	FILE *f;
 	char buf[128], *pos, *pos2, *pos3;
@@ -110,8 +115,13 @@ static int hostapd_config_read_vlan_file(struct hostapd_bss_config *bss,
 		vlan->vlan_desc.notempty = !!vlan_id;
 		os_strlcpy(vlan->ifname, pos, sizeof(vlan->ifname));
 		os_strlcpy(vlan->bridge, pos2, sizeof(vlan->bridge));
+#ifdef CONFIG_ENABLE_MAB
+		vlan->next = vlan_pt;
+		vlan_pt = vlan;
+#else
 		vlan->next = bss->vlan;
 		bss->vlan = vlan;
+#endif /* CONFIG_ENABLE_MAB */
 	}
 
 	fclose(f);
@@ -2504,6 +2514,14 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		os_strlcpy(conf->mab_bridge, pos, sizeof(conf->mab_bridge));
 	} else if (os_strcmp(buf, "dynamic_assignment") == 0) {
 		conf->dynamic_assignment = atoi(pos);
+#ifndef CONFIG_NO_VLAN
+	} else if (os_strcmp(buf, "mab_vlan_file") == 0) {
+		if (hostapd_config_read_vlan_file(bss->mab_vlan, pos)) {
+			wpa_printf(MSG_ERROR, "Line %d: failed to read MAB VLAN file '%s'",
+				   line, pos);
+			return 1;
+		}
+#endif /* CONFIG_NO_VLAN */
 #endif /* CONFIG_ENABLE_MAB */
 	} else if (os_strcmp(buf, "bridge") == 0) {
 		os_strlcpy(bss->bridge, pos, sizeof(bss->bridge));
@@ -3684,7 +3702,11 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	} else if (os_strcmp(buf, "per_sta_vif") == 0) {
 		bss->ssid.per_sta_vif = atoi(pos);
 	} else if (os_strcmp(buf, "vlan_file") == 0) {
+#ifdef CONFIG_ENABLE_MAB
+		if (hostapd_config_read_vlan_file(bss->vlan, pos)) {
+#else
 		if (hostapd_config_read_vlan_file(bss, pos)) {
+#endif /* CONFIG_ENABLE_MAB */
 			wpa_printf(MSG_ERROR, "Line %d: failed to read VLAN file '%s'",
 				   line, pos);
 			return 1;
