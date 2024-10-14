@@ -23,6 +23,9 @@
 #include "sta_info.h"
 #include "airtime_policy.h"
 #include "ap_config.h"
+#ifdef CONFIG_ENABLE_MAB
+#include "mab/mab.h"
+#endif /* CONFIG_ENABLE_MAB */
 
 #ifdef CONFIG_ENABLE_MAB
 static void hostapd_config_free_vlan(struct hostapd_vlan *vlan_pt)
@@ -1062,6 +1065,9 @@ void hostapd_config_free(struct hostapd_config *conf)
 	if (conf == NULL)
 		return;
 
+#ifdef CONFIG_ENABLE_MAB
+	free_mab_interfaces(&conf->mab_interfaces);
+#endif /* CONFIG_ENABLE_MAB */
 	for (i = 0; i < conf->num_bss; i++)
 		hostapd_config_free_bss(conf->bss[i]);
 	os_free(conf->bss);
