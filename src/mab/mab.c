@@ -166,10 +166,7 @@ void assign_ports_to_parking_vlan(struct hostapd_data *hapd)
             br_delif(old_bridge_name, mb->if_name);
         }
 
-        if (hapd->iconf->dynamic_assignment)
-        {
-            br_addif(hapd->iconf->mab_bridge, mb->if_name);
-        }
+        br_addif(hapd->iconf->mab_bridge, mb->if_name);
 
         set_interface_isolated(mb->if_index);
     }
@@ -545,10 +542,7 @@ parsing_done:
             //if the MAC expired from the mab_bridge, this is normal, as it was likely moved to a new vlan
             if (it->br_ifindex != prk_index)
             {
-                if (hapd->iconf->dynamic_assignment)
-                {
-                    move_to_bridge(it->ifindex, hapd->iconf->mab_bridge);
-                }
+                move_to_bridge(it->ifindex, hapd->iconf->mab_bridge);
                 ap_sta_disconnect(hapd, NULL, it->mac, WLAN_REASON_DEAUTH_LEAVING);
                 set_interface_isolated(it->ifindex);
             }

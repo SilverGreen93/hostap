@@ -2146,7 +2146,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 						move_to_bridge(sta->ifindex, br_name);
 						add_vid_to_ifindex(sta->ifindex, sta->vlan_id);
 					} else {
-						wpa_printf(MSG_ERROR, "MAB: No bridge configured for VLAN %d in the vlan_file!", sta->vlan_id);
+						wpa_printf(MSG_ERROR, "MAB: No bridge configured for VLAN %d in the mab_vlan_file!", sta->vlan_id);
 					}
 				}
 			} else {
@@ -2209,9 +2209,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		}
 
 		if (!strcmp(hapd->driver->name, "wired")) {
-			if (hapd->iconf->dynamic_assignment) {
-				move_to_bridge(sta->ifindex, hapd->iconf->mab_bridge);
-			}
+			move_to_bridge(sta->ifindex, hapd->iconf->mab_bridge);
 			set_interface_isolated(sta->ifindex);
 		}
 #endif /* CONFIG_ENABLE_MAB */
