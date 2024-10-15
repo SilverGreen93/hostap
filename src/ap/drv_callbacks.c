@@ -2027,7 +2027,7 @@ static void hostapd_mgmt_tx_cb(struct hostapd_data *hapd, const u8 *buf,
 #endif /* NEED_AP_MLME */
 
 #ifdef CONFIG_ENABLE_MAB
-static int hostapd_event_new_sta(struct hostapd_data *hapd, const u8 *addr, int ifindex)
+static int hostapd_event_new_sta(struct hostapd_data *hapd, const u8 *addr, char *ifname)
 #else
 static int hostapd_event_new_sta(struct hostapd_data *hapd, const u8 *addr)
 #endif /* CONFIG_ENABLE_MAB */
@@ -2042,7 +2042,7 @@ static int hostapd_event_new_sta(struct hostapd_data *hapd, const u8 *addr)
 	sta = ap_sta_add(hapd, addr);
 	if (sta) {
 #ifdef CONFIG_ENABLE_MAB
-		sta->ifindex = ifindex; //keep track of the ifindex on which the MAC was learnt
+		os_strlcpy(sta->ifname, ifname, IFNAMSIZ + 1); //keep track of the ifindex on which the MAC was learnt
 #endif /* CONFIG_ENABLE_MAB */
 		hostapd_new_assoc_sta(hapd, sta, 0);
 	} else {
@@ -2638,7 +2638,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		break;
 	case EVENT_NEW_STA:
 #ifdef CONFIG_ENABLE_MAB
-		hostapd_event_new_sta(hapd, data->new_sta.addr, data->new_sta.ifindex);
+		hostapd_event_new_sta(hapd, data->new_sta.addr, data->new_sta.ifname);
 		break;
 	case EVENT_MAB_RX:
 		mab_receive(hapd, data->eapol_rx.src);

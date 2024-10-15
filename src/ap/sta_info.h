@@ -89,7 +89,7 @@ struct sta_info {
 	struct sta_info *hnext; /* next entry in hash table list */
 	u8 addr[6];
 #ifdef CONFIG_ENABLE_MAB
-	int ifindex; //store the ifindex of the interface on which the MAC was learnt
+	char ifname[IFNAMSIZ + 1]; //store the interface name of the port on which the MAC was learnt
 #endif /* CONFIG_ENABLE_MAB */
 	be32 ipaddr;
 	struct dl_list ip6addr; /* list head for struct ip6addr */

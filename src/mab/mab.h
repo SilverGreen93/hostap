@@ -38,9 +38,9 @@ struct mab_interface {
 };
 
 void assign_ports_to_parking_vlan(struct hostapd_data *hapd);
-int move_to_bridge(int if_index, const char *new_bridge);
-void add_vid_to_ifindex(int ifindex, int vid);
-int set_interface_isolated(int ifindex);
+int move_to_bridge(char *if_name, const char *new_bridge);
+void add_vid_to_ifindex(char *if_name, int vid);
+int set_interface_isolated(char *if_name);
 int add_mab_interface(struct dl_list *list, char *if_name);
 void free_mab_interfaces(struct dl_list *list);
 void free_learned_mac_list(struct dl_list *list_pt);

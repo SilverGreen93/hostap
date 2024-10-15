@@ -6622,7 +6622,7 @@ union wpa_event_data {
 	struct new_sta {
 		const u8 *addr;
 #ifdef CONFIG_ENABLE_MAB
-		int ifindex; //store the ifindex of the interface on which the MAC was learnt
+		char ifname[IFNAMSIZ + 1]; //store the interface name of the port on which the MAC was learnt
 #endif /* CONFIG_ENABLE_MAB */
 	} new_sta;
 

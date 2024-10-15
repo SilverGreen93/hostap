@@ -1184,7 +1184,7 @@ void ieee802_1x_receive(struct hostapd_data *hapd, const u8 *sa, const u8 *buf,
 	}
 
 #ifdef CONFIG_ENABLE_MAB
-	sta->ifindex = if_nametoindex(hapd->conf->iface); // add ifindex to be able to move to the required vlan
+	os_strlcpy(sta->ifname, hapd->conf->iface, IFNAMSIZ + 1); // add EAPOL interface name to STA to be able to move to the required bridge
 #endif /* CONFIG_ENABLE_MAB */
 	key = (struct ieee802_1x_eapol_key *) (hdr + 1);
 	if (datalen >= sizeof(struct ieee802_1x_eapol_key) &&
@@ -2143,8 +2143,8 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 					const char *br_name;
 					br_name = hostapd_get_vlan_id_ifname(hapd->conf->mab_vlan, sta->vlan_id);
 					if (br_name) {
-						move_to_bridge(sta->ifindex, br_name);
-						add_vid_to_ifindex(sta->ifindex, sta->vlan_id);
+						move_to_bridge(sta->ifname, br_name);
+						add_vid_to_ifindex(sta->ifname, sta->vlan_id);
 					} else {
 						wpa_printf(MSG_ERROR, "MAB: No bridge configured for VLAN %d in the mab_vlan_file!", sta->vlan_id);
 					}
@@ -2209,8 +2209,8 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		}
 
 		if (!strcmp(hapd->driver->name, "wired")) {
-			move_to_bridge(sta->ifindex, hapd->iconf->mab_bridge);
-			set_interface_isolated(sta->ifindex);
+			move_to_bridge(sta->ifname, hapd->iconf->mab_bridge);
+			set_interface_isolated(sta->ifname);
 		}
 #endif /* CONFIG_ENABLE_MAB */
 
@@ -3117,9 +3117,11 @@ int ieee802_1x_get_mib_sta(struct hostapd_data *hapd, struct sta_info *sta,
 
 #ifdef CONFIG_ENABLE_MAB
 	ret = os_snprintf(buf + len, buflen - len,
+			"ifname=%s"
 			"is_mab_auth=%d\n"
 			"is_mab_auth_sent=%d\n"
 			"eap_mab_resp=%d\n",
+			sta->ifname,
 			sta->eapol_sm->is_mab_auth,
 			sta->eapol_sm->is_mab_auth_sent,
 			sta->eapol_sm->eap_if->eap_mab_resp);

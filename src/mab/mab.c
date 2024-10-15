@@ -168,19 +168,19 @@ void assign_ports_to_parking_vlan(struct hostapd_data *hapd)
 
         br_addif(hapd->iconf->mab_bridge, mb->if_name);
 
-        set_interface_isolated(mb->if_index);
+        set_interface_isolated(mb->if_name);
     }
 }
 
 
-int move_to_bridge(int if_index, const char *new_bridge)
+int move_to_bridge(char *if_name, const char *new_bridge)
 {
     char old_bridge[IFNAMSIZ + 1];
-    char if_name[IFNAMSIZ + 1];
+    int if_index;
     int old_index;
     int new_index;
 
-    if_indextoname(if_index, if_name);
+    if_index = if_nametoindex(if_name);
     old_index = get_bridge_index(if_index);
     if_indextoname(old_index, old_bridge);
     new_index = if_nametoindex(new_bridge);
@@ -194,7 +194,8 @@ int move_to_bridge(int if_index, const char *new_bridge)
     return 0;
 }
 
-void add_vid_to_ifindex(int ifindex, int vid) {
+
+void add_vid_to_ifindex(char *if_name, int vid) {
     struct {
         struct nlmsghdr nlh;
         struct ifinfomsg ifi;
@@ -204,6 +205,9 @@ void add_vid_to_ifindex(int ifindex, int vid) {
     struct rtattr *rta;
     int sock_fd, len;
     struct sockaddr_nl sa;
+    int if_index;
+
+    if_index = if_nametoindex(if_name);
 
     // Create a socket
     sock_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
@@ -226,7 +230,7 @@ void add_vid_to_ifindex(int ifindex, int vid) {
     req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
     req.nlh.nlmsg_type = RTM_SETLINK;
     req.ifi.ifi_family = AF_BRIDGE;
-    req.ifi.ifi_index = ifindex;
+    req.ifi.ifi_index = if_index;
 
     rta = (struct rtattr *)(((char *)&req) + NLMSG_ALIGN(req.nlh.nlmsg_len));
     rta->rta_type = IFLA_AF_SPEC;
@@ -255,8 +259,18 @@ void add_vid_to_ifindex(int ifindex, int vid) {
     close(sock_fd);
 }
 
-int set_interface_isolated(int ifindex)
+int set_interface_isolated(char *if_name)
 {
+    struct
+    {
+        struct nlmsghdr nlh;
+        struct ifinfomsg ifi;
+        char buf[BUFSIZE];
+    } req;
+
+    int if_index;
+
+    if_index = if_nametoindex(if_name);
 
     int sock = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
     if (sock < 0)
@@ -265,19 +279,12 @@ int set_interface_isolated(int ifindex)
         return 1;
     }
 
-    struct
-    {
-        struct nlmsghdr nlh;
-        struct ifinfomsg ifi;
-        char buf[BUFSIZE];
-    } req;
-
     memset(&req, 0, sizeof(req));
     req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
     req.nlh.nlmsg_flags = NLM_F_REQUEST;
     req.nlh.nlmsg_type = RTM_SETLINK;
     req.ifi.ifi_family = PF_BRIDGE;
-    req.ifi.ifi_index = ifindex;
+    req.ifi.ifi_index = if_index;
 
     struct rtattr *rta = (struct rtattr *)(((char *)&req) + NLMSG_ALIGN(req.nlh.nlmsg_len));
     rta->rta_type = IFLA_PROTINFO | NLA_F_NESTED;
@@ -475,8 +482,8 @@ int request_mac(struct hostapd_data *hapd)
             {
                 int master_index = *(int *)RTA_DATA(tb[NDA_MASTER]);
                 int if_index = ndm->ndm_ifindex;
-                char master_name[IF_NAMESIZE];
-                char if_name[IF_NAMESIZE];
+                char master_name[IF_NAMESIZE + 1] = {0};
+                char if_name[IF_NAMESIZE + 1] = {0};
                 if_indextoname(master_index, master_name);
                 if_indextoname(if_index, if_name);
                 if (master_index && if_index)
@@ -520,7 +527,7 @@ int request_mac(struct hostapd_data *hapd)
                             union wpa_event_data event;
                             os_memset(&event, 0, sizeof(event));
                             event.new_sta.addr = addr;
-                            event.new_sta.ifindex = if_index;
+                            os_strlcpy(event.new_sta.ifname, if_name, IF_NAMESIZE + 1);
                             wpa_supplicant_event(hapd, EVENT_NEW_STA, &event);
                             wpa_supplicant_event(hapd, EVENT_MAB_RX, &event);
                         }
@@ -542,8 +549,10 @@ parsing_done:
             //if the MAC expired from the mab_bridge, this is normal, as it was likely moved to a new vlan
             if (it->br_ifindex != prk_index)
             {
-                move_to_bridge(it->ifindex, hapd->iconf->mab_bridge);
-                set_interface_isolated(it->ifindex);
+                char if_name[IF_NAMESIZE + 1] = {0};
+                if_indextoname(it->ifindex, if_name);
+                move_to_bridge(if_name, hapd->iconf->mab_bridge);
+                set_interface_isolated(if_name);
             }
             ap_sta_disconnect(hapd, NULL, it->mac, WLAN_REASON_DEAUTH_LEAVING);
             dl_list_del(&it->list);
