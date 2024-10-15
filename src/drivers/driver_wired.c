@@ -412,6 +412,12 @@ static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 
 #ifdef CONFIG_ENABLE_MAB
 	if (!dl_list_empty(&hapd->iconf->mab_interfaces)) {
+		if (hapd->iconf->mab_bridge[0] == '\0') {
+			wpa_printf(MSG_ERROR,
+			   "MAB: mab_interfaces specified, but mab_bridge is missing!");
+			os_free(drv);
+			return NULL;
+		}
 		if (mab_init_sockets(drv)) {
 			os_free(drv);
 			return NULL;
@@ -420,7 +426,7 @@ static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 		assign_ports_to_parking_vlan(hapd);
 	} else {
 		wpa_printf(MSG_INFO,
-			   "MAB: configuration is missing, starting in EAPOL mode");
+			   "MAB: MAB configuration is missing!");
 	}
 
 	if (hapd->conf->iface[0] == '\0' &&
@@ -428,7 +434,7 @@ static void * wired_driver_hapd_init(struct hostapd_data *hapd,
 		strncpy(hapd->conf->iface, hapd->iconf->mab_bridge, IFNAMSIZ + 1);
 		params->ifname = hapd->conf->iface;
 		wpa_printf(MSG_INFO,
-			   "MAB: EAPOL interface is missing, starting in MAB mode");
+			   "MAB: EAPOL interface is missing!");
 	} else
 #endif /* CONFIG_ENABLE_MAB */
 	if (wired_init_sockets(drv, params->own_addr)) {
