@@ -3117,7 +3117,7 @@ int ieee802_1x_get_mib_sta(struct hostapd_data *hapd, struct sta_info *sta,
 
 #ifdef CONFIG_ENABLE_MAB
 	ret = os_snprintf(buf + len, buflen - len,
-			"ifname=%s"
+			"ifname=%s\n"
 			"is_mab_auth=%d\n"
 			"is_mab_auth_sent=%d\n"
 			"eap_mab_resp=%d\n",
