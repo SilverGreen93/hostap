@@ -370,9 +370,6 @@ void ap_free_sta(struct hostapd_data *hapd, struct sta_info *sta)
 	 * vlan_remove_dynamic() can check that no stations are left on the
 	 * AP_VLAN netdev.
 	 */
-#ifdef CONFIG_ENABLE_MAB
-	if (!sta->eapol_sm->is_mab_auth)
-#endif /* CONFIG_ENABLE_MAB */
 	if (sta->vlan_id)
 		vlan_remove_dynamic(hapd, sta->vlan_id);
 	if (sta->vlan_id_bound) {
@@ -1632,6 +1629,12 @@ void ap_sta_disconnect(struct hostapd_data *hapd, struct sta_info *sta,
 
 	if (sta == NULL)
 		return;
+#ifdef CONFIG_ENABLE_MAB
+	if (sta->eapol_sm->is_mab_auth) {
+		// prevent vlan_remove_dynamic from deleting the bridge
+		sta->vlan_id = 0;
+	}
+#endif /* CONFIG_ENABLE_MAB */
 	ap_sta_set_authorized(hapd, sta, 0);
 	sta->flags &= ~(WLAN_STA_AUTH | WLAN_STA_ASSOC);
 	hostapd_set_sta_flags(hapd, sta);
