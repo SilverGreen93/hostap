@@ -2506,6 +2506,10 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		parse_mab_interfaces(pos, conf);
 	} else if (os_strcmp(buf, "mab_bridge") == 0) {
 		os_strlcpy(conf->mab_bridge, pos, sizeof(conf->mab_bridge));
+	} else if (os_strcmp(buf, "vlan_bridge") == 0) {
+		os_strlcpy(conf->vlan_bridge, pos, sizeof(conf->vlan_bridge));
+		wpa_printf(MSG_INFO, "MAB: vlan_bridge is set to '%s', ignoring mab_vlan_file if present.",
+				   conf->vlan_bridge);
 	} else if (os_strcmp(buf, "dynamic_assignment") == 0) {
 		conf->dynamic_assignment = atoi(pos);
 #ifndef CONFIG_NO_VLAN

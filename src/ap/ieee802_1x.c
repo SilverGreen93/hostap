@@ -2141,7 +2141,11 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 				}
 				if (hapd->iconf->dynamic_assignment) {
 					const char *br_name;
-					br_name = hostapd_get_vlan_id_ifname(hapd->conf->mab_vlan, sta->vlan_id);
+					if (hapd->iconf->vlan_bridge[0] != '\0') {
+						br_name = hapd->iconf->vlan_bridge;
+					} else {
+						br_name = hostapd_get_vlan_id_ifname(hapd->conf->mab_vlan, sta->vlan_id);
+					}
 					if (br_name) {
 						move_to_bridge(sta->ifname, br_name);
 						add_vid_to_ifindex(sta->ifname, sta->vlan_id);
