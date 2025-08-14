@@ -2042,7 +2042,8 @@ static int hostapd_event_new_sta(struct hostapd_data *hapd, const u8 *addr)
 	sta = ap_sta_add(hapd, addr);
 	if (sta) {
 #ifdef CONFIG_ENABLE_MAB
-		os_strlcpy(sta->ifname, ifname, IFNAMSIZ + 1); //keep track of the ifindex on which the MAC was learnt
+		/* keep track of the ifname on which the MAC was learnt */
+		os_strlcpy(sta->ifname, ifname, IFNAMSIZ + 1);
 #endif /* CONFIG_ENABLE_MAB */
 		hostapd_new_assoc_sta(hapd, sta, 0);
 	} else {

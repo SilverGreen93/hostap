@@ -1631,7 +1631,7 @@ void ap_sta_disconnect(struct hostapd_data *hapd, struct sta_info *sta,
 		return;
 #ifdef CONFIG_ENABLE_MAB
 	if (sta->eapol_sm->is_mab_auth) {
-		// prevent vlan_remove_dynamic from deleting the bridge
+		/* prevent vlan_remove_dynamic from deleting the bridge */
 		sta->vlan_id = 0;
 	}
 #endif /* CONFIG_ENABLE_MAB */

@@ -1,4 +1,4 @@
-Use the instructions below to make an Ubuntu 20.04.6 LTS test VM from scratch.
+Use the instructions below to make a Ubuntu 20.04.6 LTS test VM from scratch.
 The instructions were adapted from the older example-setup.txt and README files
 and were validated with hostapd pre-release version 2.12.
 -------------------------------------------------------------------------------

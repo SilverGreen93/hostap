@@ -1178,13 +1178,15 @@ void ieee802_1x_receive(struct hostapd_data *hapd, const u8 *sa, const u8 *buf,
 		sta->eapol_sm->dot1xAuthLastEapolFrameVersion = hdr->version;
 		sta->eapol_sm->dot1xAuthEapolFramesRx++;
 #ifdef CONFIG_ENABLE_MAB
-		sta->eapol_sm->is_mab_auth = false; //ensure that if a new eapol is received after a mab request, it can be re-authorized.
+		/* ensure that if a new eapol is received after a mab request, it can be re-authorized */
+		sta->eapol_sm->is_mab_auth = false;
 		sta->eapol_sm->eap_if->eap_mab_resp = false;
 #endif /* CONFIG_ENABLE_MAB */
 	}
 
 #ifdef CONFIG_ENABLE_MAB
-	os_strlcpy(sta->ifname, hapd->conf->iface, IFNAMSIZ + 1); // add EAPOL interface name to STA to be able to move to the required bridge
+	/* add EAPOL interface name to STA to be able to move to the required bridge */
+	os_strlcpy(sta->ifname, hapd->conf->iface, IFNAMSIZ + 1);
 #endif /* CONFIG_ENABLE_MAB */
 	key = (struct ieee802_1x_eapol_key *) (hdr + 1);
 	if (datalen >= sizeof(struct ieee802_1x_eapol_key) &&
@@ -2137,7 +2139,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 			if (sta->vlan_id >= 0) {
 				if (sta->vlan_id == 0) {
 					wpa_printf(MSG_DEBUG, "MAB: No VLAN information received from RADIUS! Assuming VLAN 1.");
-					sta->vlan_id = 1; //put in VLAN 1
+					sta->vlan_id = 1;
 				}
 				if (hapd->iconf->dynamic_assignment) {
 					const char *br_name;

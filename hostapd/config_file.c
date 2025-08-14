@@ -2481,7 +2481,8 @@ static void parse_mab_interfaces(char *intf, struct hostapd_config *conf)
 
 	wpa_printf(MSG_INFO, "MAB: Initialize interfaces: %s", intf);
 
-	free_mab_interfaces(&conf->mab_interfaces); //free interfaces if interface was configured via hostapd_cli
+	/* free interfaces if interface was configured via hostapd_cli */
+	free_mab_interfaces(&conf->mab_interfaces);
 	dl_list_init(&conf->mab_interfaces);
 
 	token = strtok(intf, ",");

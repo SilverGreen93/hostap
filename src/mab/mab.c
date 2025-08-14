@@ -209,7 +209,6 @@ void add_vid_to_ifindex(char *if_name, int vid) {
 
     if_index = if_nametoindex(if_name);
 
-    // Create a socket
     sock_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
     if (sock_fd < 0) {
         perror("socket");
@@ -258,6 +257,7 @@ void add_vid_to_ifindex(char *if_name, int vid) {
 
     close(sock_fd);
 }
+
 
 int set_interface_isolated(char *if_name)
 {
@@ -447,7 +447,7 @@ int request_mac(struct hostapd_data *hapd)
         return -1;
     }
 
-    // invalidam lista inainte de parcurgerea MAC-urilor
+    /* make elements invalid before parsing the MACs */
     dl_list_for_each(it, &hapd->iconf->learned_mac_list, struct learned_mac, list)
         it->valid = 0;
 
@@ -488,7 +488,7 @@ int request_mac(struct hostapd_data *hapd)
                 if_indextoname(if_index, if_name);
                 if (master_index && if_index)
                 {
-                    // learn mac only if the ifindex of the port is in the configured ports list
+                    /* learn MAC only if the ifindex of the port is in the configured ports list */
                     if (list_contains_interface(&hapd->iconf->mab_interfaces, if_index))
                     {
                         unsigned char *addr;
@@ -507,8 +507,9 @@ int request_mac(struct hostapd_data *hapd)
                             {
                                 found = 1;
                                 it->valid = 1;
-                                it->ifindex = if_index; // in varianta in care actualizam aici, nu se mai re-trimite la radius request cind se muta pe noul bridge
+                                it->ifindex = if_index;
                                 it->br_ifindex = master_index;
+                                /* update was done here, do not send RADIUS request when moving on the new bridge */
                                 break;
                             }
                         }
@@ -523,7 +524,7 @@ int request_mac(struct hostapd_data *hapd)
                             new_mac->valid = 1;
                             dl_list_add(&hapd->iconf->learned_mac_list, &new_mac->list);
 
-                            // apelez eveniment de new mac
+                            /* call new MAC event */
                             union wpa_event_data event;
                             os_memset(&event, 0, sizeof(event));
                             event.new_sta.addr = addr;
@@ -545,8 +546,8 @@ parsing_done:
         if (!it->valid)
         {
             int prk_index = if_nametoindex(hapd->iconf->mab_bridge);
-            //move the port in the mab_bridge only if if was learnt and removed from any other bridge
-            //if the MAC expired from the mab_bridge, this is normal, as it was likely moved to a new vlan
+            /* move the port in the mab_bridge only if if was learnt and removed from any other bridge. */
+            /* if the MAC expired from the mab_bridge, this is normal, as it was likely moved to a new vlan. */
             if (it->br_ifindex != prk_index)
             {
                 char if_name[IF_NAMESIZE + 1] = {0};
@@ -627,7 +628,8 @@ int get_bridge_index(int ifindex) {
     return -1;
 }
 
-//bazat pe ieee802_1x_receive
+
+/* based on the logic of ieee802_1x_receive */
 void mab_receive(struct hostapd_data *hapd, const u8 *sa)
 {
     struct sta_info *sta;
@@ -640,19 +642,17 @@ void mab_receive(struct hostapd_data *hapd, const u8 *sa)
 			return;      
 		sta->eapol_sm->eap_if->portEnabled = true;
 	}
-   
-    //sta->eapol_sm->flags &= ~EAPOL_SM_WAIT_START;
-    //sta->eapol_sm->eapolStart = true;
+
     sta->eapol_sm->is_mab_auth = true;
 	sta->eapol_sm->is_mab_auth_sent = false;
 
     eapol_auth_step(sta->eapol_sm);
 }
 
-// bazat pe ieee802_1x_encapsulate_radius
+
+/* based on the logic of ieee802_1x_encapsulate_radius */
 void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta)
 {
-
     struct eapol_state_machine *sm = sta->eapol_sm;
     struct radius_msg *msg;
     char identity[15];
@@ -661,7 +661,7 @@ void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta)
 	if (!sm)
 		return;
 
-	//stabilire identitate si parola dupa mac
+	/* get identity and password based on MAC */
 	snprintf(identity, sizeof(identity), "%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx",
 		sta->addr[0], sta->addr[1], sta->addr[2], sta->addr[3], sta->addr[4], sta->addr[5]);
     identity_len = strlen(identity);
@@ -698,10 +698,6 @@ void send_mab_request(struct hostapd_data *hapd, struct sta_info *sta)
 
     if (add_common_radius_attr(hapd, hapd->conf->radius_auth_req_attr, sta, msg) < 0)
 	    goto fail;
-
-    //SQL lite nu este activat
-	//if (sta && add_sqlite_radius_attr(hapd, sta, msg, 0) < 0)
-	//	goto fail;
 
 	if (!hostapd_config_get_radius_attr(hapd->conf->radius_auth_req_attr, RADIUS_ATTR_FRAMED_MTU) &&
 	    !radius_msg_add_attr_int32(msg, RADIUS_ATTR_FRAMED_MTU, 1400)) {

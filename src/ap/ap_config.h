@@ -1254,11 +1254,11 @@ struct hostapd_config {
 	bool ht_vht_twt_responder;
 
 #ifdef CONFIG_ENABLE_MAB
-	struct dl_list learned_mac_list;	//list of MACs that have been learned
-	struct dl_list mab_interfaces;		//list of interfaces on which MAB is enabled
-	char mab_bridge[IFNAMSIZ + 1];		//interface name of the mab_bridge
-	char vlan_bridge[IFNAMSIZ + 1];		//interface name of the vlan_bridge (the vlan-aware bridge)
-	int dynamic_assignment;				//specifies if the port should be moved to bridge according to vlan_file rules
+	struct dl_list learned_mac_list;	/* list of MACs that have been learned */
+	struct dl_list mab_interfaces;		/* list of interfaces on which MAB is enabled */
+	char mab_bridge[IFNAMSIZ + 1];		/* interface name of the mab_bridge */
+	char vlan_bridge[IFNAMSIZ + 1];		/* interface name of the vlan_bridge (the vlan-aware bridge) */
+	int dynamic_assignment;				/* specifies if the port should be moved to bridge according to vlan_file rules */
 #endif /* CONFIG_ENABLE_MAB */
 };
 
